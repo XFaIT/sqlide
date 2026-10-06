@@ -42,9 +42,9 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-m 'not integration'"
+addopts = "-m 'not docker'"
 asyncio_mode = "auto"
-markers = ["integration: needs Docker / network"]
+markers = ["docker: needs Docker (postgres, clickhouse)"]
 
 [tool.pyright]
 include = ["src"]
