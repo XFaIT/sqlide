@@ -43,17 +43,18 @@ def to_csv(rows: Sequence[Row], header: Sequence[str] | None = None) -> str:
     return buf.getvalue().rstrip("\n")
 
 
-def to_markdown(rows: Sequence[Row], header: Sequence[str]) -> str:
-    def cell(v: Any) -> str:
-        return raw_text(v).replace("|", "\\|").replace("\r\n", "<br>").replace("\n", "<br>")
+def md_cell(v: Any) -> str:
+    return raw_text(v).replace("|", "\\|").replace("\r\n", "<br>").replace("\n", "<br>")
 
-    lines = ["| " + " | ".join(cell(h) for h in header) + " |"]
+
+def to_markdown(rows: Sequence[Row], header: Sequence[str]) -> str:
+    lines = ["| " + " | ".join(md_cell(h) for h in header) + " |"]
     lines.append("| " + " | ".join("---" for _ in header) + " |")
-    lines += ["| " + " | ".join(cell(v) for v in row) + " |" for row in rows]
+    lines += ["| " + " | ".join(md_cell(v) for v in row) + " |" for row in rows]
     return "\n".join(lines)
 
 
-def _json_default(v: Any) -> Any:
+def json_default(v: Any) -> Any:
     if isinstance(v, Decimal):
         return int(v) if v == v.to_integral_value() else float(v)
     if isinstance(v, dt.datetime):
@@ -67,7 +68,7 @@ def _json_default(v: Any) -> Any:
 
 def to_json(rows: Sequence[Row], header: Sequence[str]) -> str:
     objs = [dict(zip(header, row, strict=True)) for row in rows]
-    return json.dumps(objs, default=_json_default, ensure_ascii=False, indent=2)
+    return json.dumps(objs, default=json_default, ensure_ascii=False, indent=2)
 
 
 def sql_literal(v: Any) -> str:
@@ -84,12 +85,12 @@ def sql_literal(v: Any) -> str:
     return "'" + raw_text(v).replace("'", "''") + "'"
 
 
-def _ident(name: str) -> str:
+def sql_ident(name: str) -> str:
     return name if _PLAIN_IDENT.match(name) else '"' + name.replace('"', '""') + '"'
 
 
 def to_insert_sql(rows: Sequence[Row], header: Sequence[str], table: str = "table_name") -> str:
-    cols = ", ".join(_ident(h) for h in header)
+    cols = ", ".join(sql_ident(h) for h in header)
     return "\n".join(
         f"INSERT INTO {table} ({cols}) VALUES ({', '.join(sql_literal(v) for v in row)});"
         for row in rows

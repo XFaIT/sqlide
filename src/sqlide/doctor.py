@@ -29,9 +29,24 @@ def check_dirs() -> tuple[bool, str]:
     return True, f"config {paths.config_dir()}, data {paths.data_dir()}"
 
 
+def check_clipboard() -> tuple[bool, str]:
+    from sqlide import clipboard
+
+    # OSC52 still works without a native tool, so this is informational, never a failure
+    return True, clipboard.available()
+
+
+def check_exporters() -> tuple[bool, str]:
+    from sqlide import export
+
+    return True, ", ".join(e.name for e in export.all_exporters())
+
+
 CHECKS: list[tuple[str, Check]] = [
     ("java", check_jvm),
     ("drivers", check_drivers),
+    ("clipboard", check_clipboard),
+    ("export", check_exporters),
     ("dirs", check_dirs),
 ]
 
@@ -41,5 +56,5 @@ def run() -> int:
     for label, fn in CHECKS:
         ok, detail = fn()
         bad += not ok
-        print(f"[{'ok' if ok else '!!'}] {label:<8} {detail}")
+        print(f"[{'ok' if ok else '!!'}] {label:<10} {detail}")
     return 1 if bad else 0

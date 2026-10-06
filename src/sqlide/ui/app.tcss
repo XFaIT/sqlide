@@ -28,3 +28,8 @@ ConfirmScreen, PasswordPrompt, ProgressScreen, ConnectionEditor { align: center 
 .dialog .hint { color: $text-muted; margin-top: 1; }
 ValueViewer, CopyMenu { align: center middle; }
 CopyMenu OptionList { height: auto; max-height: 12; }
+
+ExportScreen { align: center middle; }
+ExportScreen RadioSet { height: auto; }
+ExportScreen .row Input { width: 12; }
+ExportScreen #table_name { width: 40; }

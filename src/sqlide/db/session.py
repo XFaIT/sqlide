@@ -11,9 +11,9 @@ import asyncio
 import contextlib
 import threading
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, TypeVar
+from typing import Any, TypeVar, cast
 
 import jpype
 
@@ -164,6 +164,43 @@ class DbSession:
     # --- execution ---
     async def execute(self, sql: str, page_size: int = DEFAULT_PAGE) -> Execution:
         return await self.call(lambda _c: self._execute_sync(sql, page_size))
+
+    async def stream(
+        self,
+        sql: str,
+        consumer: Callable[[list[Column], Iterator[tuple]], T],
+        page_size: int = 2000,
+    ) -> T:
+        """Run `sql`, hand its first result set to `consumer` as a lazy row iterator.
+
+        `consumer` runs on the session thread, so it may block (write a file). Pages are
+        fetched on demand: memory stays flat for any result size.
+        """
+        return await self.call(lambda _c: self._stream_sync(sql, page_size, consumer))
+
+    def _stream_sync(
+        self, sql: str, page_size: int, consumer: Callable[[list[Column], Iterator[tuple]], T]
+    ) -> T:
+        ex = self._execute_sync(sql, page_size)
+        item = next((i for i in ex.items if i.has_rows), None)
+        if item is None:
+            raise DbError("The statement did not return a result set")
+
+        cur = cast("_Cursor | None", item.cursor)
+
+        def rows() -> Iterator[tuple]:
+            yield from item.rows
+            while cur is not None and not cur.closed:
+                page, done = cur._read(page_size)
+                yield from page
+                if done:
+                    break
+
+        try:
+            return consumer(item.columns, rows())
+        finally:
+            if cur is not None:
+                cur._close_sync()
 
     def cancel(self) -> None:
         """Thread-safe. Aborts the running statement, if any."""

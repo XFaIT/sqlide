@@ -72,6 +72,7 @@ class ResultGrid(ScrollView, can_focus=True):
         Binding("slash", "filter", "Filter"),
         Binding("l", "load_more", "More rows", show=False),
         Binding("L", "load_all", "All rows", show=False),
+        Binding("e", "export", "Export"),
     ]
 
     class Summary(Message):
@@ -82,15 +83,22 @@ class ResultGrid(ScrollView, can_focus=True):
     class FilterRequested(Message):
         pass
 
+    class ExportRequested(Message):
+        def __init__(self, grid: ResultGrid) -> None:
+            super().__init__()
+            self.grid = grid
+
     def __init__(
         self,
         columns: Sequence[Column],
         rows: Sequence[tuple[Any, ...]] = (),
         source: RowSource | None = None,
         page_size: int = 500,
+        sql: str = "",
         **kw: Any,
     ) -> None:
         super().__init__(**kw)
+        self.sql = sql  # the statement that produced this result (for re-run exports)
         self.model = GridModel(columns, rows)
         self.source = source
         self.page_size = page_size
@@ -358,10 +366,15 @@ class ResultGrid(ScrollView, can_focus=True):
             self._loading = False
 
     # --- copy / view ---
-    def _selected(self) -> tuple[list[tuple[Any, ...]], list[str]]:
+    def selection_data(self) -> tuple[list[Column], list[tuple[Any, ...]]]:
+        """Columns and rows of the selection rectangle (view order)."""
         r0, c0, r1, c1 = self.selection_rect()
         rows = [row[c0 : c1 + 1] for row in self.model.rows(r0, r1)]
-        return rows, [c.name for c in self.model.columns[c0 : c1 + 1]]
+        return self.model.columns[c0 : c1 + 1], rows
+
+    def _selected(self) -> tuple[list[tuple[Any, ...]], list[str]]:
+        cols, rows = self.selection_data()
+        return rows, [c.name for c in cols]
 
     def render_copy(self, fmt: str) -> str:
         rows, head = self._selected()
@@ -391,6 +404,10 @@ class ResultGrid(ScrollView, can_focus=True):
             self.app.copy_to_clipboard(text)
         rows, head = self._selected()
         self.app.notify(f"Copied {len(rows)}×{len(head)} ({used or 'terminal clipboard'})")
+
+    def action_export(self) -> None:
+        if len(self.model):
+            self.post_message(self.ExportRequested(self))
 
     def action_copy(self) -> None:
         self.copy("tsv")

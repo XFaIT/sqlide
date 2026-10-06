@@ -55,9 +55,10 @@ class ResultPanel(Vertical):
         rows: Sequence[tuple[Any, ...]],
         source: RowSource | None = None,
         page_size: int = 500,
+        sql: str = "",
     ) -> ResultGrid:
         self._counter += 1
-        grid = ResultGrid(columns, rows, source, page_size)
+        grid = ResultGrid(columns, rows, source, page_size, sql)
         await self.tabs.add_pane(TabPane(title, ResultView(grid), id=f"r{self._counter}"))
         return grid
 
