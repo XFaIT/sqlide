@@ -14,6 +14,7 @@ from textual.widgets import TextArea
 
 from sqlide.config.connections import Connection
 from sqlide.consoles import CONSOLE, FILE, TabState
+from sqlide.db.metadata import MetaCache
 from sqlide.db.result import DbError
 from sqlide.db.session import DbSession
 from sqlide.ui.widgets.console_export import ExportActions
@@ -61,6 +62,7 @@ class ConsoleTab(ExportActions, Vertical):
         self.conn_name = conn_name
         self.conn: Connection | None = None
         self.session: DbSession | None = None
+        self.meta: MetaCache | None = None
         self._executing = False
         self._autosave: Timer | None = None
         try:
@@ -137,6 +139,7 @@ class ConsoleTab(ExportActions, Vertical):
     async def attach(self, conn: Connection, session: DbSession) -> None:
         await self.detach()
         self.conn, self.session, self.conn_name = conn, session, conn.name
+        self.meta = MetaCache(session)
         self.editor.dialect = self.ws.driver(conn.driver).dialect
         self._refresh_tx(message="")
         self.status.update_state(connection=f"{conn.name} ({session.product})")
@@ -146,7 +149,7 @@ class ConsoleTab(ExportActions, Vertical):
     async def detach(self) -> None:
         if self.session is not None:
             await self.session.close()
-        self.conn = self.session = None
+        self.conn = self.session = self.meta = None
         self.status.update_state(connection="not connected", tx="", message="")
 
     async def shutdown(self) -> None:

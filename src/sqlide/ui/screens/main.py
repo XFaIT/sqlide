@@ -8,7 +8,7 @@ from pathlib import Path
 from textual import work
 from textual.app import ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal
+from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
 from textual.widgets import Footer, Header, ListView, TabbedContent, TabPane
 
@@ -20,11 +20,13 @@ from sqlide.drivers.loader import DriverError
 from sqlide.drivers.maven import MavenError
 from sqlide.jvm.locate import JvmNotFound
 from sqlide.jvm.runtime import ensure_jvm
+from sqlide.sql.snippets import qualified_name, select_all
 from sqlide.ui.screens.connection_editor import ConnectionEditor
 from sqlide.ui.screens.dialogs import ConfirmScreen, PasswordPrompt, PathPrompt, ProgressScreen
 from sqlide.ui.widgets.connections_list import ConnectionItem, ConnectionsList
 from sqlide.ui.widgets.console_tab import ConsoleTab
 from sqlide.ui.widgets.console_tabs import ConsoleTabs
+from sqlide.ui.widgets.schema_tree import SchemaTree
 from sqlide.workspace import Workspace
 
 EXPECTED_ERRORS = (ConfigError, MavenError, DriverError, DbError, JvmNotFound)
@@ -40,6 +42,7 @@ class MainScreen(Screen):
         Binding("alt+right", "tab(1)", "Next tab", show=False),
         Binding("alt+left", "tab(-1)", "Previous tab", show=False),
         Binding("alt+1", "focus_sidebar", "Connections", show=False),
+        Binding("alt+4", "focus_schema", "Schema", show=False),
         Binding("alt+2", "focus_editor", "Editor", show=False),
         Binding("alt+3", "focus_results", "Results", show=False),
     ]
@@ -52,7 +55,9 @@ class MainScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal():
-            yield ConnectionsList(id="sidebar")
+            with Vertical(id="side"):
+                yield ConnectionsList(id="sidebar")
+                yield SchemaTree(id="schema")
             yield ConsoleTabs.build(self.ws, self.ws.consoles.load_state(), self._files, id="tabs")
         yield Footer()
 
@@ -60,6 +65,10 @@ class MainScreen(Screen):
     @property
     def sidebar(self) -> ConnectionsList:
         return self.query_one("#sidebar", ConnectionsList)
+
+    @property
+    def schema(self) -> SchemaTree:
+        return self.query_one("#schema", SchemaTree)
 
     @property
     def tabs(self) -> ConsoleTabs:
@@ -91,6 +100,8 @@ class MainScreen(Screen):
     def _sync_subtitle(self) -> None:
         console = self.tabs.active_console
         self.app.sub_title = console.conn_name if console else ""
+        if console is not None:
+            self.schema.show(console.meta, console.conn_name)
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         if event.tabbed_content is self.tabs:  # not the result tabs inside a console
@@ -103,6 +114,25 @@ class MainScreen(Screen):
     # --- focus ---
     def action_focus_sidebar(self) -> None:
         self.sidebar.focus()
+
+    def action_focus_schema(self) -> None:
+        self.schema.focus()
+
+    def on_schema_tree_table_chosen(self, msg: SchemaTree.TableChosen) -> None:
+        msg.stop()
+        console = self.console
+        dialect = console.editor.dialect
+        name = qualified_name([msg.table.namespace, msg.table.name], dialect)
+        editor = console.editor
+        if msg.action == "insert":
+            editor.insert(name)
+            editor.focus()
+            return
+        sql = select_all(name, dialect)
+        editor.move_cursor(editor.document.end)
+        editor.insert(("\n\n" if editor.text.strip() else "") + sql + ";")
+        editor.focus()
+        console.run_statements([sql])
 
     def action_focus_editor(self) -> None:
         self.console.editor.focus()

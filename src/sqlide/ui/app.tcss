@@ -1,7 +1,9 @@
-#sidebar {
+#side {
     width: 30;
     border-right: solid $primary-darken-2;
 }
+#sidebar { height: 35%; }
+#schema { height: 1fr; border-top: solid $primary-darken-2; }
 #sidebar ListItem { padding: 0 1; }
 #sidebar .dim { color: $text-muted; text-style: italic; }
 #editor { height: 3fr; }
