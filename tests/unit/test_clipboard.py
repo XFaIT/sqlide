@@ -61,3 +61,8 @@ def test_copy_native_tries_next_backend_on_failure(monkeypatch):
 def test_copy_native_none_when_nothing_available(monkeypatch):
     monkeypatch.setattr(clipboard, "backends", lambda: [])
     assert clipboard.copy_native("x") is None
+
+
+def test_windows_uses_clip(monkeypatch):
+    monkeypatch.setattr("shutil.which", lambda name: "C:/Windows/System32/clip.exe")
+    assert [b[0] for b in clipboard.backends(platform="win32", wsl=False)] == ["clip"]

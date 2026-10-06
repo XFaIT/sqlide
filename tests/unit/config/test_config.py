@@ -102,3 +102,22 @@ def test_resolver_prompt_cached_and_cancel():
     assert calls == ["a"]  # second call served from cache
     r.forget("a")
     assert PasswordResolver().resolve(conn, lambda c: None) is None  # cancelled
+
+
+def test_password_cmd_keeps_windows_backslashes(monkeypatch):
+    import subprocess
+
+    from sqlide.config import secrets
+    from sqlide.config.connections import Connection
+
+    seen = {}
+
+    def fake_run(cmd, **kw):
+        seen["cmd"] = cmd
+        return subprocess.CompletedProcess(cmd, 0, stdout="pw\n")
+
+    monkeypatch.setattr(secrets.subprocess, "run", fake_run)
+    monkeypatch.setattr(secrets.os, "name", "nt")
+    conn = Connection("c", "h2", "jdbc:h2:mem:x", password_cmd=r"C:\tools\getpw.exe --name db")
+    assert secrets.PasswordResolver().lookup(conn) == "pw"
+    assert seen["cmd"] == [r"C:\tools\getpw.exe", "--name", "db"]

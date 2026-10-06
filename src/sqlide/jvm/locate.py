@@ -69,7 +69,11 @@ def _candidates() -> list[Path]:
                 out.append(Path(r.stdout.strip()))
         except (OSError, subprocess.SubprocessError):
             pass
-        out += [Path("/opt/homebrew/opt/openjdk"), Path("/usr/local/opt/openjdk")]
+        # Homebrew's openjdk is keg-only: the JDK sits under libexec, and is not on PATH
+        for prefix in (Path("/opt/homebrew/opt/openjdk"), Path("/usr/local/opt/openjdk")):
+            out += [prefix / "libexec/openjdk.jdk/Contents/Home", prefix]
+    elif sys.platform.startswith("linux"):
+        out += [Path("/home/linuxbrew/.linuxbrew/opt/openjdk")]
     return out
 
 

@@ -20,15 +20,14 @@ class Sqlide < Formula
 
   def install
     virtualenv_install_with_resources
-  end
-
-  def caveats
-    <<~EOS
-      sqlide needs a Java runtime; the one from the openjdk formula is used automatically
-      when JAVA_HOME is set:
-        export JAVA_HOME="#{Formula["openjdk"].opt_prefix}"
-      Run `sqlide doctor` to check the setup.
-    EOS
+    # keg-only openjdk is not on PATH: point sqlide at it
+    java_home = if OS.mac?
+      Formula["openjdk"].opt_libexec/"openjdk.jdk/Contents/Home"
+    else
+      Formula["openjdk"].opt_prefix
+    end
+    rm bin/"sqlide"
+    (bin/"sqlide").write_env_script libexec/"bin/sqlide", JAVA_HOME: java_home
   end
 
   test do

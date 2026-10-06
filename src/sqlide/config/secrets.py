@@ -52,7 +52,7 @@ class PasswordResolver:
             return None
         try:
             res = subprocess.run(
-                shlex.split(conn.password_cmd),
+                shlex.split(conn.password_cmd, posix=os.name != "nt"),
                 capture_output=True,
                 text=True,
                 timeout=CMD_TIMEOUT_S,

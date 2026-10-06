@@ -12,7 +12,7 @@ from sqlide.config.connections import Connection, ConnectionStore
 from sqlide.config.secrets import PasswordResolver
 from sqlide.config.settings import Settings, load_settings
 from sqlide.consoles import ConsoleStore
-from sqlide.db.factory import create_session
+from sqlide.db.factory import create_session, is_private_database
 from sqlide.db.session import DbSession
 from sqlide.drivers.registry import DriverDef, DriverRegistry
 from sqlide.history import HistoryStore
@@ -69,6 +69,22 @@ class Workspace:
 
     async def lookup_password(self, conn: Connection) -> str | None:
         return await asyncio.to_thread(self.resolver.lookup, conn)
+
+    async def connect_for_metadata(self, conn: Connection) -> DbSession | None:
+        """A second connection for schema reads, so they never queue behind a running query.
+
+        None when that is not possible (in-memory database, password not known, any error):
+        the caller then keeps using the main session.
+        """
+        if is_private_database(conn.url):
+            return None
+        try:
+            password = await self.lookup_password(conn)
+            if password is None and self.needs_password_prompt(conn):
+                return None
+            return await self.connect(conn, password)
+        except Exception:  # noqa: BLE001 - purely an optimisation
+            return None
 
     async def connect(self, conn: Connection, password: str | None) -> DbSession:
         await asyncio.to_thread(ensure_jvm)

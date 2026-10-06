@@ -327,3 +327,31 @@ async def test_frame_is_not_drawn_below_the_text(make_ws):
         assert "▏" in ed.render_line(0).text[:6]
         for row in (1, 5, 20):
             assert "▏" not in ed.render_line(row).text[:6]
+
+
+async def test_schema_reads_use_their_own_connection_and_do_not_wait_for_a_query(make_ws, tmp_path):
+    import asyncio
+
+    url = f"jdbc:h2:file:{tmp_path / 'meta'}"
+    app = SqlideApp(make_ws(Connection("h", "h2", url)))
+    async with app.run_test(size=(120, 40)) as pilot:
+        await connect_first(pilot, app)
+        c = active(app)
+        await wait_for(pilot, lambda: c.meta_session is not None)
+        assert c.meta_session is not c.session
+        c.editor.text = "select sum(x * x % 7) from system_range(1, 3000000000)"
+        c.editor.focus()
+        await pilot.press("f5")
+        await wait_for(pilot, lambda: c.running)
+        spaces = await asyncio.wait_for(c.meta.namespaces(), 10)  # would block on one connection
+        assert any(n.name == "PUBLIC" for n in spaces)
+        c.action_cancel()
+        await wait_for(pilot, lambda: not c.running)
+
+
+async def test_in_memory_database_keeps_the_shared_session(make_ws):
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("sharedmeta"))))
+    async with app.run_test(size=(120, 40)) as pilot:
+        await connect_first(pilot, app)
+        await pilot.pause(0.5)
+        assert active(app).meta_session is None

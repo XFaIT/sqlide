@@ -82,6 +82,10 @@ class MetaCache:
         self._tables: dict[str, list[Table]] = {}
         self._columns: dict[tuple[str, str], list[Column]] = {}
 
+    def use(self, session: DbSession) -> None:
+        """Read from another session (a dedicated one) from now on; the cache stays."""
+        self._s = session
+
     def refresh(self) -> None:
         self._namespaces = None
         self._current = None

@@ -8,6 +8,7 @@ it is part of the statement (Oracle needs `END;`).
 from __future__ import annotations
 
 import bisect
+import re
 from dataclasses import dataclass
 
 from sqlide.sql.dialects import BlockRules, Rules, rules_for
@@ -16,8 +17,10 @@ from sqlide.sql.lexer import (
     LINE_COMMENT,
     LPAREN,
     PUNCT,
+    QIDENT,
     RPAREN,
     SEMI,
+    STRING,
     WORD,
     WS,
     Token,
@@ -62,6 +65,7 @@ class _Chunk:
         self.pending_end = False
         self.scan_create = False
         self.type_pending = False
+        self.batch_scoped = False  # body runs to GO, unless a BEGIN..END block ends it
 
     @property
     def nested(self) -> bool:
@@ -75,8 +79,13 @@ class _Chunk:
         )
 
 
+_DELIMITER_LINE = re.compile(r"^[ \t]*delimiter[ \t]+(\S+)[ \t]*$", re.I | re.M)
+
+
 def split(text: str, dialect: str = "generic", blank_line: bool = True) -> list[Span]:
     rules = rules_for(dialect)
+    if rules.delimiter_command and _DELIMITER_LINE.search(text):
+        return _split_with_delimiter(text, dialect, blank_line, rules)
     spans: list[Span] = []
     ch = _Chunk()
 
@@ -133,6 +142,51 @@ def split(text: str, dialect: str = "generic", blank_line: bool = True) -> list[
     return spans
 
 
+def _split_with_delimiter(text: str, dialect: str, blank_line: bool, rules: Rules) -> list[Span]:
+    """MySQL client semantics: 'DELIMITER x' lines switch the terminator; they are not SQL."""
+    spans: list[Span] = []
+    delim, pos = ";", 0
+    for m in [*_DELIMITER_LINE.finditer(text), None]:
+        end = m.start() if m else len(text)
+        segment = text[pos:end]
+        if delim == ";":
+            spans += [Span(s.start + pos, s.end + pos) for s in split(segment, dialect, blank_line)]
+        else:
+            spans += [Span(s.start + pos, s.end + pos) for s in _split_on(segment, delim, rules)]
+        if m:
+            delim, pos = m.group(1), m.end()
+    return spans
+
+
+def _split_on(text: str, delim: str, rules: Rules) -> list[Span]:
+    """Split on a custom terminator outside strings and comments; bodies stay whole."""
+    spans: list[Span] = []
+    first: int | None = None
+    last = 0
+    skip_to = 0
+    for t in tokenize(text, rules):
+        if t.start < skip_to or t.kind == WS or t.kind in (LINE_COMMENT, BLOCK_COMMENT):
+            continue
+        idx = (
+            -1 if t.kind in (STRING, QIDENT) else text.find(delim, t.start, t.end + len(delim) - 1)
+        )
+        if idx != -1 and idx < t.end:  # the terminator can be glued to a word: `end$$`
+            if idx > t.start:
+                if first is None:
+                    first = t.start
+                last = idx
+            if first is not None:
+                spans.append(Span(first, last))
+            first, skip_to = None, idx + len(delim)
+            continue
+        if first is None:
+            first = t.start
+        last = t.end
+    if first is not None:
+        spans.append(Span(first, last))
+    return spans
+
+
 def _batch_separator_end(text: str, t: Token, rules: Rules) -> int:
     """If `t` is an Oracle '/' or MSSQL 'GO [n]' alone on its line: that line's end, else -1."""
     word = text[t.start : t.end]
@@ -177,6 +231,8 @@ def _open(ch: _Chunk) -> None:
 
 def _close_block(ch: _Chunk) -> None:
     ch.depth = max(0, ch.depth - 1)
+    if ch.batch_scoped and ch.depth == 0 and ch.had_block:
+        ch.slash_only = False  # a real BEGIN..END body is complete: ';' may end the statement
 
 
 def _on_word(ch: _Chunk, word: str, br: BlockRules) -> None:
@@ -233,6 +289,8 @@ def _detect_head(ch: _Chunk, word: str, br: BlockRules) -> None:
         ch.ctx = True
         if word in br.expect_begin_for:
             ch.expect_begin = True
+        if word in br.batch_scoped:
+            ch.slash_only = ch.batch_scoped = True
         if word == "TYPE":
             ch.type_pending, ch.scan_create = True, True  # TYPE BODY is decided by next word
         elif word in br.slash_only_for:

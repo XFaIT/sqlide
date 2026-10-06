@@ -91,16 +91,20 @@ full screen in Windows Terminal.
 
 Override with `SQLIDE_CONFIG_DIR` and `SQLIDE_DATA_DIR`.
 
-## Known limits
+## Notes
 
-- MySQL client-side `DELIMITER` is not supported; SQL Server procedures without
-  `BEGIN` need `GO` between batches.
-- The schema tree and autocomplete use the tab's own connection, so they wait while a
-  query is running (`Ctrl+F2` cancels it).
+- Schema reads (tree, autocomplete) use a second connection, so they work while a query runs.
+  For in-memory databases (H2 `mem:`, SQLite `:memory:`, DuckDB) a second connection would see
+  a different database, so the query connection is shared and reads wait for a running query.
 - Autocomplete reads cached metadata. DDL you run in the editor refreshes it; changes made by
-  other clients need `F5` in the schema tree.
+  other clients need `F5` in the schema tree. In manual-commit mode new objects appear after
+  Commit.
+- MySQL `DELIMITER x` lines are understood (they are not sent to the server). On SQL Server,
+  `CREATE PROCEDURE/FUNCTION/TRIGGER` without `BEGIN..END` runs up to the next `GO`, as T-SQL does.
 - `Alt+1`..`Alt+4` only work in terminals with the kitty keyboard protocol; most terminals
   deliver them as Mac characters, so use the letter keys or `F6`.
+- Tested on Linux and WSL against PostgreSQL, MySQL, MariaDB, ClickHouse, SQL Server, Oracle and
+  H2. macOS is covered by CI; native Windows is best effort (use WSL).
 
 ## Development
 

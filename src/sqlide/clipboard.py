@@ -35,6 +35,8 @@ def backends(platform: str | None = None, wsl: bool | None = None) -> list[Backe
     candidates: list[Backend] = []
     if platform == "darwin":
         candidates.append(("pbcopy", ["pbcopy"], _utf8))
+    elif platform == "win32":
+        candidates.append(("clip", ["clip"], _utf16))
     else:
         if os.environ.get("WAYLAND_DISPLAY"):
             candidates.append(("wl-copy", ["wl-copy"], _utf8))

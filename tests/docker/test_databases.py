@@ -118,3 +118,49 @@ async def test_cancel_long_query(db):
     with contextlib.suppress(DbError):
         await asyncio.wait_for(task, 15)
     assert (await db.execute("select 1")).items[0].rows == [(1,)]
+
+
+async def run_script(db, script: str):
+    results = []
+    for span in split(script, db_dialect(db)):
+        ex = await db.execute(span.text(script))
+        results.append(ex)
+    return results
+
+
+async def test_mysql_delimiter_script_creates_and_calls_procedure(db):
+    if db.kind not in ("mysql", "mariadb"):
+        pytest.skip("MySQL-family only")
+    script = """\
+DROP PROCEDURE IF EXISTS sqlide_p;
+DELIMITER $$
+CREATE PROCEDURE sqlide_p()
+BEGIN
+  SELECT 1 AS a;
+
+  SELECT 2 AS b;
+END$$
+DELIMITER ;
+CALL sqlide_p();
+"""
+    results = await run_script(db, script)
+    call = results[-1]
+    assert [item.rows[0][0] for item in call.items if item.has_rows] == [1, 2]
+
+
+async def test_mssql_procedure_without_begin_runs_to_go(db):
+    if db.kind != "mssql":
+        pytest.skip("SQL Server only")
+    script = """\
+drop procedure if exists sqlide_p
+go
+create procedure sqlide_p as
+select 11 as x;
+
+select 22 as y;
+go
+exec sqlide_p
+"""
+    results = await run_script(db, script)
+    rows = [i.rows[0][0] for i in results[-1].items if i.has_rows]
+    assert rows == [11, 22]

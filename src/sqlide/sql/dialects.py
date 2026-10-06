@@ -17,6 +17,8 @@ class BlockRules:
     declare_starts_block: bool = False
     top_begin_block: bool = False  # statement-initial BEGIN is a block, not a transaction
     tx_words: frozenset[str] = frozenset()  # BEGIN <word> is a transaction start
+    # CREATE <kind> whose body runs to the end of the batch (GO) unless it is a BEGIN..END block
+    batch_scoped: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -30,6 +32,7 @@ class Rules:
     q_quote: bool = False  # oracle q'[...]'
     e_strings: bool = False  # postgres E'..\n..'
     slash_lines: bool = False  # '/' alone on a line ends a statement
+    delimiter_command: bool = False  # mysql client 'DELIMITER x' lines
     go_batches: bool = False  # 'GO' alone on a line ends a batch
     block: BlockRules | None = None
 
@@ -44,6 +47,7 @@ RULES: dict[str, Rules] = {
         backslash_escapes=True,
         backtick=True,
         hash_comment=True,
+        delimiter_command=True,
         block=BlockRules(
             openers=_F({"IF", "WHILE", "REPEAT"}),
             inline_openers=_F({"LOOP"}),
@@ -68,9 +72,10 @@ RULES: dict[str, Rules] = {
         brackets=True,
         go_batches=True,
         block=BlockRules(
-            routines=_F({"PROCEDURE", "FUNCTION", "TRIGGER"}),
+            routines=_F({"PROCEDURE", "PROC", "FUNCTION", "TRIGGER"}),
             top_begin_block=True,
             tx_words=_F({"TRAN", "TRANSACTION", "DISTRIBUTED"}),
+            batch_scoped=_F({"PROCEDURE", "PROC", "FUNCTION", "TRIGGER"}),
         ),
     ),
     "sqlite": Rules(

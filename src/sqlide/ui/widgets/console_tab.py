@@ -74,6 +74,7 @@ class ConsoleTab(ExportActions, Vertical):
         self.conn: Connection | None = None
         self.session: DbSession | None = None
         self.meta: MetaCache | None = None
+        self.meta_session: DbSession | None = None
         self._executing = False
         self._autosave: Timer | None = None
         try:
@@ -151,13 +152,28 @@ class ConsoleTab(ExportActions, Vertical):
         await self.detach()
         self.conn, self.session, self.conn_name = conn, session, conn.name
         self.meta = MetaCache(session)
+        self.run_worker(self._open_meta_session(conn, self.meta), group="meta", exclusive=True)
         self.editor.dialect = self.ws.driver(conn.driver).dialect
         self._refresh_tx(message="")
         self.status.update_state(connection=f"{conn.name} ({session.product})")
         self.panel.log_line(f"Connected: {conn.name}: {session.product}", "green")
         self._title_changed()
 
+    async def _open_meta_session(self, conn: Connection, meta: MetaCache) -> None:
+        second = await self.ws.connect_for_metadata(conn)
+        if second is None:
+            return
+        if self.meta is not meta:  # detached or reconnected while we were connecting
+            await second.close()
+            return
+        self.meta_session = second
+        meta.use(second)
+
     async def detach(self) -> None:
+        self.workers.cancel_group(self, "meta")
+        if self.meta_session is not None:
+            await self.meta_session.close()
+            self.meta_session = None
         if self.session is not None:
             await self.session.close()
         self.conn = self.session = self.meta = None
@@ -210,6 +226,9 @@ class ConsoleTab(ExportActions, Vertical):
         except DbError as e:
             self.app.notify(str(e), severity="error")
             return
+        if self.meta is not None:  # DDL committed now becomes visible to the metadata session
+            self.meta.refresh()
+            self.post_message(self.SchemaChanged(self))
         self.panel.log_line("Committed" if commit else "Rolled back", "green")
         self._refresh_tx(message="committed" if commit else "rolled back")
 

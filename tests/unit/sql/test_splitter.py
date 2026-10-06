@@ -211,3 +211,59 @@ def test_fuzz_invariants_all_dialects():
                 assert prev_end <= sp.start < sp.end <= len(text), (dialect, text)
                 assert not text[sp.start].isspace()  # (an unterminated quote may end in spaces)
                 prev_end = sp.end
+
+
+MYSQL_PROC = """\
+DELIMITER $$
+CREATE PROCEDURE p()
+BEGIN
+  SELECT 1;
+
+  SELECT ';$$' AS s;
+END$$
+DELIMITER ;
+SELECT 2;
+SELECT 3
+"""
+
+
+def test_mysql_delimiter_keeps_routine_body_whole():
+    got = stmts(MYSQL_PROC, "mysql")
+    assert got == [
+        "CREATE PROCEDURE p()\nBEGIN\n  SELECT 1;\n\n  SELECT ';$$' AS s;\nEND",
+        "SELECT 2",
+        "SELECT 3",
+    ]
+
+
+def test_mysql_delimiter_lines_are_not_statements_and_custom_terminators_work():
+    assert stmts(
+        "delimiter //\nselect 1; select 2//\nselect 3//\nDELIMITER ;\nselect 4", "mysql"
+    ) == [
+        "select 1; select 2",
+        "select 3",
+        "select 4",
+    ]
+    assert stmts("delimiter ;;\nselect 1;;\nselect 2", "mysql") == ["select 1", "select 2"]
+
+
+def test_mysql_delimiter_spans_point_into_the_original_text():
+    text = "select 0;\nDELIMITER $$\nselect 1$$\nDELIMITER ;\nselect 2;"
+    assert [s.text(text) for s in split(text, "mysql")] == ["select 0", "select 1", "select 2"]
+
+
+def test_delimiter_word_is_just_a_word_in_other_dialects():
+    assert stmts("delimiter x\nselect 1", "postgres") == ["delimiter x\nselect 1"]
+
+
+def test_mssql_proc_without_begin_runs_to_go():
+    sql = "create procedure p as\nselect 1;\n\nselect 2;\ngo\nselect 3"
+    assert stmts(sql, "mssql") == ["create procedure p as\nselect 1;\n\nselect 2;", "select 3"]
+    assert stmts("CREATE OR ALTER PROC p AS SELECT 1; SELECT 2", "mssql") == [
+        "CREATE OR ALTER PROC p AS SELECT 1; SELECT 2"
+    ]
+
+
+def test_mssql_proc_with_begin_end_ends_at_its_terminator():
+    sql = "create proc p as begin select 1; select 2; end; select 3"
+    assert stmts(sql, "mssql") == ["create proc p as begin select 1; select 2; end;", "select 3"]

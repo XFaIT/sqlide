@@ -24,3 +24,14 @@ def create_session(
         defn.dialect,
         conn.autocommit,
     )
+
+
+_PRIVATE_MARKERS = (":mem:", ":memory:", "mode=memory", "jdbc:derby:memory", "jdbc:duckdb:")
+
+
+def is_private_database(url: str) -> bool:
+    """True when a second connection would not see this connection's data (in-memory DBs)."""
+    low = url.lower()
+    if low.startswith("jdbc:duckdb:"):
+        return low in ("jdbc:duckdb:", "jdbc:duckdb::memory:") or ":memory:" in low
+    return any(m in low for m in _PRIVATE_MARKERS)
