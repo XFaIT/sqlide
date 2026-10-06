@@ -2,6 +2,19 @@
 name = "sqlide"
 version = "0.1.0"
 description = "Terminal SQL IDE (DataGrip-like) over JDBC"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "XFaIT" }]
+keywords = ["sql", "jdbc", "tui", "terminal", "database", "datagrip"]
+classifiers = [
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Database :: Front-Ends",
+]
 requires-python = ">=3.12"
 dependencies = [
     "textual[syntax]>=0.80",
