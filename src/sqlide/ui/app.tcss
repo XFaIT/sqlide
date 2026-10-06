@@ -9,7 +9,8 @@
 #editor { height: 3fr; }
 #results { height: 2fr; border-top: solid $primary-darken-2; }
 
-ConfirmScreen, PasswordPrompt, ProgressScreen, ConnectionEditor { align: center middle; }
+ConfirmScreen, PasswordPrompt, ProgressScreen, ConnectionEditor, SettingsScreen,
+DriverManager, DriverEditor { align: center middle; }
 .dialog {
     width: 60;
     height: auto;
@@ -18,6 +19,7 @@ ConfirmScreen, PasswordPrompt, ProgressScreen, ConnectionEditor { align: center 
     background: $surface;
 }
 .dialog.wide { width: 80; }
+.dialog { max-height: 100%; overflow-y: auto; }
 .dialog .title { text-style: bold; margin-bottom: 1; }
 .dialog .buttons { height: auto; margin-top: 1; }
 .dialog .buttons Button { margin-right: 2; }
@@ -58,3 +60,6 @@ HistoryScreen { align: center middle; }
     border-top: solid $primary-darken-2;
     overflow-y: auto;
 }
+
+#driver-list { height: 12; }
+.dialog .hint { color: $text-muted; margin-top: 1; }

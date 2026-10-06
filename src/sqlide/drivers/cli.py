@@ -6,8 +6,9 @@ import argparse
 import sys
 
 from sqlide.config._toml import ConfigError
+from sqlide.drivers.custom import build_custom_driver
 from sqlide.drivers.maven import MavenError
-from sqlide.drivers.registry import DriverDef, DriverRegistry
+from sqlide.drivers.registry import DriverRegistry
 
 
 def register(sub: argparse._SubParsersAction) -> None:
@@ -56,25 +57,15 @@ def _install(reg: DriverRegistry, args: argparse.Namespace) -> int:
 
 
 def _add(reg: DriverRegistry, args: argparse.Namespace) -> int:
-    group = artifact = ""
-    classifiers = [""]
-    if args.maven:
-        parts = args.maven.split(":")
-        if len(parts) not in (2, 3):
-            raise ConfigError("--maven expects group:artifact[:classifier]")
-        group, artifact = parts[0], parts[1]
-        classifiers = [parts[2] if len(parts) == 3 else ""]
     reg.add_custom(
-        DriverDef(
-            id=args.id,
-            name=args.name or args.id,
+        build_custom_driver(
+            args.id,
+            args.name,
+            maven=args.maven or "",
+            jars=args.jar,
             class_name=args.class_name,
             url_template=args.url_template,
             dialect=args.dialect,
-            group=group,
-            artifact=artifact,
-            classifiers=classifiers,
-            jars=args.jar,
         )
     )
     print(f"driver '{args.id}' saved to {reg.user_file}")

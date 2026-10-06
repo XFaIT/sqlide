@@ -14,6 +14,7 @@ from textual.widgets import Footer, Header, ListView, TabbedContent, TabPane
 
 from sqlide.config._toml import ConfigError
 from sqlide.config.connections import Connection
+from sqlide.config.settings import save_settings
 from sqlide.consoles import FILE
 from sqlide.db.result import DbError
 from sqlide.drivers.loader import DriverError
@@ -23,7 +24,9 @@ from sqlide.jvm.runtime import ensure_jvm
 from sqlide.sql.snippets import qualified_name, select_all
 from sqlide.ui.screens.connection_editor import ConnectionEditor
 from sqlide.ui.screens.dialogs import ConfirmScreen, PasswordPrompt, PathPrompt, ProgressScreen
+from sqlide.ui.screens.driver_manager import DriverManager
 from sqlide.ui.screens.history import HistoryScreen
+from sqlide.ui.screens.settings import SettingsScreen
 from sqlide.ui.widgets.connections_list import ConnectionItem, ConnectionsList
 from sqlide.ui.widgets.console_tab import ConsoleTab
 from sqlide.ui.widgets.console_tabs import ConsoleTabs
@@ -210,6 +213,25 @@ class MainScreen(Screen):
             self.app.notify(str(e), title="Cannot save", severity="error")
             return
         self.app.notify(f"Saved {console.path}")
+
+    # --- settings and drivers ---
+    @work(exclusive=True, group="dialog")
+    async def action_settings(self) -> None:
+        new = await self.app.push_screen_wait(
+            SettingsScreen(self.ws.settings, sorted(self.app.available_themes))
+        )
+        if new is None:
+            return
+        self.ws.settings = new
+        self.ws.history.limit = new.history_limit
+        for console in self.tabs.consoles():
+            console.editor.blank_line = new.split_on_blank_line
+        self.app.theme = new.theme  # also persisted by the theme watcher
+        save_settings(new)
+
+    @work(exclusive=True, group="dialog")
+    async def action_drivers(self) -> None:
+        await self.app.push_screen_wait(DriverManager(self.ws))
 
     # --- history ---
     @work(exclusive=True, group="dialog")

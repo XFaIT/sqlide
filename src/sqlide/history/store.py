@@ -43,7 +43,7 @@ class HistoryStore:
 
     def __init__(self, path: Path | None = None, limit: int = 5000) -> None:
         self._path = path
-        self._limit = limit
+        self.limit = limit
         self._db: sqlite3.Connection | None = None
 
     def _conn(self) -> sqlite3.Connection:
@@ -72,7 +72,7 @@ class HistoryStore:
             (time.time() if ts is None else ts, connection, sql, int(ok), elapsed_ms, error),
         )
         db.execute(
-            "DELETE FROM history WHERE id <= (SELECT MAX(id) FROM history) - ?", (self._limit,)
+            "DELETE FROM history WHERE id <= (SELECT MAX(id) FROM history) - ?", (self.limit,)
         )
         db.commit()
 

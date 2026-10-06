@@ -89,6 +89,15 @@ class SqlEditor(TextArea):
         self._dialect = value
         self._recalc()
 
+    @property
+    def blank_line(self) -> bool:
+        return self._blank_line
+
+    @blank_line.setter
+    def blank_line(self, value: bool) -> None:
+        self._blank_line = value
+        self._recalc()
+
     # --- spans and frame ---
     def _recalc(self) -> None:
         self._spans = split(self.text, self._dialect, self._blank_line)
