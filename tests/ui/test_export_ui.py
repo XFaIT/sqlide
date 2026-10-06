@@ -115,7 +115,8 @@ async def test_overwrite_is_guarded(make_ws, tmp_path):
         dlg = await open_export(pilot, app)
         dlg.query_one("#path", Input).value = str(existing)
         await pilot.click("#export")
-        await wait_for(pilot, lambda: "exists" in str(dlg.query_one("#error", Static).render()))
+        await wait_for(pilot, lambda: bool(str(dlg.query_one("#error", Static).render()).strip()))
+        assert "exists" in str(dlg.query_one("#error", Static).render())
         assert isinstance(app.screen, ExportScreen)  # still open
         assert existing.read_text() == "precious"
         dlg.query_one("#overwrite", Switch).value = True
@@ -137,7 +138,7 @@ async def test_export_failure_is_reported_not_fatal(make_ws, tmp_path):
         dlg.query_one("#path", Input).value = str(blocker / "sub" / "x.csv")
         await pilot.click("#export")
         await wait_for(pilot, lambda: console(app).status.message == "export failed")
-        assert any("Export failed" in n.title for n in app._notifications)
+        await wait_for(pilot, lambda: any("Export failed" in n.title for n in app._notifications))
         assert isinstance(app.screen, MainScreen)
 
 
