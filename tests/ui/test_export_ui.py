@@ -115,9 +115,8 @@ async def test_overwrite_is_guarded(make_ws, tmp_path):
         dlg = await open_export(pilot, app)
         dlg.query_one("#path", Input).value = str(existing)
         await pilot.click("#export")
-        await pilot.pause()
+        await wait_for(pilot, lambda: "exists" in str(dlg.query_one("#error", Static).render()))
         assert isinstance(app.screen, ExportScreen)  # still open
-        assert "exists" in str(dlg.query_one("#error", Static).render())
         assert existing.read_text() == "precious"
         dlg.query_one("#overwrite", Switch).value = True
         await pilot.click("#export")

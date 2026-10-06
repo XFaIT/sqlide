@@ -40,6 +40,6 @@ def test_homebrew_keg_only_openjdk_is_found_on_macos(monkeypatch):
     monkeypatch.setattr(
         locate.subprocess, "run", lambda *a, **k: (_ for _ in ()).throw(OSError("no java_home"))
     )
-    paths = [str(p) for p in locate._candidates()]
+    paths = [p.as_posix() for p in locate._candidates()]
     assert "/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home" in paths
     assert "/usr/local/opt/openjdk/libexec/openjdk.jdk/Contents/Home" in paths
