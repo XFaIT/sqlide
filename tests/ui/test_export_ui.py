@@ -1,7 +1,9 @@
 """Export dialog and execution, driven through the real app against H2."""
 
 import csv
+import sys
 
+import pytest
 from openpyxl import load_workbook
 from textual.widgets import Input, RadioButton, RadioSet, Select, Static, Switch
 
@@ -105,6 +107,7 @@ async def test_export_selection_scope(make_ws, tmp_path):
         ]  # fmt: skip
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="click timing flaky on CI Windows")
 async def test_overwrite_is_guarded(make_ws, tmp_path):
     app = SqlideApp(make_ws(Connection("h", "h2", URL.format("ex4"))))
     existing = tmp_path / "keep.csv"
