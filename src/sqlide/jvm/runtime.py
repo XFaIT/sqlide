@@ -5,6 +5,7 @@ from __future__ import annotations
 import threading
 
 import jpype
+import jpype.config
 
 from sqlide.jvm.locate import JvmInfo, locate_jvm
 
@@ -20,6 +21,9 @@ def ensure_jvm() -> JvmInfo:
             return _info
         info = locate_jvm()
         if not jpype.isJVMStarted():
+            # We start the JVM from worker threads; DestroyJavaVM at interpreter exit then
+            # hangs. Sessions are closed explicitly, so skipping the JVM teardown loses nothing.
+            jpype.config.destroy_jvm = False
             jpype.startJVM(str(info.libjvm), "-Djava.awt.headless=true", convertStrings=False)
             _silence_jvm_streams()
         _info = info

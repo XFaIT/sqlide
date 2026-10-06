@@ -22,14 +22,25 @@ class PasswordResolver:
     def __init__(self) -> None:
         self._cache: dict[str, str] = {}
 
-    def resolve(self, conn: Connection, prompt: Prompt) -> str | None:
+    def lookup(self, conn: Connection) -> str | None:
+        """Non-interactive sources only. None = the user has to be asked. May block (cmd)."""
         if conn.name in self._cache:
             return self._cache[conn.name]
         password = self._from_cmd(conn) or self._from_env(conn)
-        if password is None:
-            password = prompt(conn)
         if password is not None:
             self._cache[conn.name] = password
+        return password
+
+    def store(self, name: str, password: str) -> None:
+        self._cache[name] = password
+
+    def resolve(self, conn: Connection, prompt: Prompt) -> str | None:
+        """Sync convenience: lookup, else ask via `prompt` (UI code uses lookup/store)."""
+        password = self.lookup(conn)
+        if password is None:
+            password = prompt(conn)
+            if password is not None:
+                self.store(conn.name, password)
         return password
 
     def forget(self, name: str) -> None:

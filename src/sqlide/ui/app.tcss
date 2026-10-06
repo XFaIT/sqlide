@@ -1,0 +1,24 @@
+#sidebar {
+    width: 30;
+    border-right: solid $primary-darken-2;
+}
+#sidebar ListItem { padding: 0 1; }
+#sidebar .dim { color: $text-muted; text-style: italic; }
+#editor { height: 3fr; }
+#results { height: 2fr; border-top: solid $primary-darken-2; }
+
+ConfirmScreen, PasswordPrompt, ProgressScreen, ConnectionEditor { align: center middle; }
+.dialog {
+    width: 60;
+    height: auto;
+    padding: 1 2;
+    border: thick $primary;
+    background: $surface;
+}
+.dialog.wide { width: 80; }
+.dialog .title { text-style: bold; margin-bottom: 1; }
+.dialog .buttons { height: auto; margin-top: 1; }
+.dialog .buttons Button { margin-right: 2; }
+.dialog .row { height: 3; }
+.dialog .row Label { margin-right: 2; padding-top: 1; }
+.dialog .error { color: $error; }

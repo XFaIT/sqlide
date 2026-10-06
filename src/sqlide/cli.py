@@ -29,7 +29,9 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if getattr(args, "handler", None):
         return args.handler(args)
-    print("sqlide: TUI not implemented yet (stage 5)")
+    from sqlide.app import SqlideApp
+
+    SqlideApp().run()
     return 0
 
 
