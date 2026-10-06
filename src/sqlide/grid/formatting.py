@@ -26,3 +26,18 @@ def format_value(v: Any) -> str:
     if isinstance(v, float):
         return repr(v)
     return str(v).replace("\r\n", "⏎").replace("\n", "⏎").replace("\t", "⇥")
+
+
+def raw_text(v: Any) -> str:
+    """Full-fidelity text for copy/export: no truncation, NULL is empty."""
+    if v is None:
+        return ""
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, bytes):
+        return "0x" + v.hex()
+    if isinstance(v, dt.datetime):
+        return v.isoformat(sep=" ")
+    if isinstance(v, Decimal):
+        return format(v, "f")
+    return str(v)

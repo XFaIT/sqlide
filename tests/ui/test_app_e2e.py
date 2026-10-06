@@ -3,14 +3,14 @@
 import asyncio
 
 import pytest
-from textual.widgets import DataTable, Input, RichLog
+from textual.widgets import Input, RichLog
 
 from sqlide.app import SqlideApp
 from sqlide.config.connections import Connection, ConnectionStore
 from sqlide.config.settings import Settings
 from sqlide.drivers.registry import DriverRegistry
-from sqlide.ui.screens.dialogs import ConfirmScreen, PasswordPrompt
 from sqlide.ui.screens.connection_editor import ConnectionEditor
+from sqlide.ui.screens.dialogs import ConfirmScreen, PasswordPrompt
 from sqlide.ui.screens.main import MainScreen
 from sqlide.ui.widgets.result_grid import ResultGrid
 from sqlide.workspace import Workspace
