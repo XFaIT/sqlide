@@ -1,0 +1,50 @@
+[project]
+name = "sqlide"
+version = "0.1.0"
+description = "Terminal SQL IDE (DataGrip-like) over JDBC"
+requires-python = ">=3.12"
+dependencies = [
+    "textual[syntax]>=0.80",
+    "jpype1>=1.5",
+    "openpyxl>=3.1",
+    "platformdirs>=4",
+    "tomli-w>=1.0",
+    "httpx>=0.27",
+    "sqlglot>=25",
+]
+
+[project.scripts]
+sqlide = "sqlide.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=8",
+    "pytest-asyncio>=0.23",
+    "pytest-textual-snapshot>=1",
+    "ruff>=0.6",
+    "pyright>=1.1.380",
+    "textual-dev>=1.8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sqlide"]
+
+[tool.ruff]
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = ["integration: needs Docker / network"]
+
+[tool.pyright]
+include = ["src"]
+pythonVersion = "3.12"
