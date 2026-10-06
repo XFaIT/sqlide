@@ -26,6 +26,11 @@ dependencies = [
     "sqlglot>=25",
 ]
 
+[project.urls]
+Homepage = "https://github.com/XFaIT/sqlide"
+Repository = "https://github.com/XFaIT/sqlide"
+Issues = "https://github.com/XFaIT/sqlide/issues"
+
 [project.scripts]
 sqlide = "sqlide.cli:main"
 
