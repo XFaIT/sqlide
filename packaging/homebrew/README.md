@@ -1,11 +1,20 @@
 # Homebrew
 
-`sqlide.rb` is the formula for sqlide 0.1.0 (url, sha256 and resources filled in) for a tap (`brew tap XFaIT/sqlide`).
+`sqlide.rb` is the formula, published in the tap `XFaIT/homebrew-sqlide` (`Formula/sqlide.rb`).
+It creates a virtualenv and installs the published wheels from PyPI (`pip --only-binary`), so
+nothing is compiled. `openjdk` is a dependency; the wrapper script sets `JAVA_HOME`.
 
-1. Release to PyPI (push a `v*` tag; `.github/workflows/release.yml` publishes).
-2. Create the repository `homebrew-sqlide` and put the formula in `Formula/sqlide.rb`.
-3. For a later release, update `url` and `sha256` from the PyPI sdist, then run
-   `brew update-python-resources sqlide` to refresh the resources.
-4. `brew install --build-from-source XFaIT/sqlide/sqlide && brew test sqlide`.
+Install:
 
-Users then run `brew install XFaIT/sqlide/sqlide`.
+```bash
+brew tap XFaIT/sqlide
+brew install XFaIT/sqlide/sqlide
+```
+
+New release:
+
+1. Push a `v*` tag; `.github/workflows/release.yml` publishes to PyPI.
+2. In the formula, update `url` and `sha256` from the PyPI sdist (`sqlide-X.Y.Z.tar.gz`).
+   The version is derived from the `url`, and `pip` installs `sqlide==<version>`.
+3. Copy the formula to the tap repo. Its CI (`.github/workflows/test.yml`) installs it on macOS
+   and Linux and checks `sqlide --version` and Java detection.
