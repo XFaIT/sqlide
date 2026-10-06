@@ -112,9 +112,14 @@ class ConsoleTab(Vertical):
                 for item in ex.items:
                     if item.has_rows:
                         n_results += 1
-                        await self.panel.add_result(f"Result {n_results}", item.columns, item.rows)
-                        more = "+ (more rows not loaded)" if item.cursor else ""
-                        last = f"{len(item.rows)}{more} rows"
+                        grid = await self.panel.add_result(
+                            f"Result {n_results}",
+                            item.columns,
+                            item.rows,
+                            item.cursor,
+                            self.ws.settings.fetch_size,
+                        )
+                        last = grid.summary_text
                     else:
                         last = f"{item.update_count} rows affected"
                         self.panel.log_line(f"  {last}")
