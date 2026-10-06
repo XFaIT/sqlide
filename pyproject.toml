@@ -17,7 +17,10 @@ classifiers = [
 ]
 requires-python = ">=3.12"
 dependencies = [
-    "textual[syntax]>=0.80",
+    "textual>=0.80",
+    "tree-sitter>=0.23",
+    "tree-sitter-sql>=0.3",
+    "tree-sitter-json>=0.24",
     "jpype1>=1.5",
     "openpyxl>=3.1",
     "platformdirs>=4",
