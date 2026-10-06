@@ -84,7 +84,7 @@ full screen in Windows Terminal.
 
 ## Files
 
-| What | Where (Linux; macOS and Windows use the platform equivalents) |
+| What | Where (Linux and WSL; macOS uses the platform equivalents) |
 |---|---|
 | Settings, connections, custom drivers, keymap | `~/.config/sqlide/` |
 | Downloaded drivers, history, consoles | `~/.local/share/sqlide/` |
@@ -104,7 +104,7 @@ Override with `SQLIDE_CONFIG_DIR` and `SQLIDE_DATA_DIR`.
 - `Alt+1`..`Alt+4` only work in terminals with the kitty keyboard protocol; most terminals
   deliver them as Mac characters, so use the letter keys or `F6`.
 - Tested on Linux and WSL against PostgreSQL, MySQL, MariaDB, ClickHouse, SQL Server, Oracle and
-  H2. macOS is covered by CI; native Windows is best effort (use WSL).
+  H2. macOS is covered by CI. On Windows, run it inside WSL (native Windows is not supported).
 
 ## Development
 
