@@ -1,0 +1,103 @@
+# Built-in driver presets. Users add/override entries in drivers.toml (same keys).
+# classifiers: tried in order, first that exists on Maven Central wins ("" = plain jar).
+# version_suffix: keep only versions ending with it (mssql ships jre8/jre11 builds).
+
+[[driver]]
+id = "postgres"
+name = "PostgreSQL / Greenplum"
+class_name = "org.postgresql.Driver"
+url_template = "jdbc:postgresql://{host}:{port}/{database}"
+default_port = 5432
+dialect = "postgres"
+group = "org.postgresql"
+artifact = "postgresql"
+classifiers = [""]
+
+[[driver]]
+id = "clickhouse"
+name = "ClickHouse"
+class_name = "com.clickhouse.jdbc.ClickHouseDriver"
+url_template = "jdbc:clickhouse://{host}:{port}/{database}"
+default_port = 8123
+dialect = "clickhouse"
+group = "com.clickhouse"
+artifact = "clickhouse-jdbc"
+classifiers = ["all-dependencies", "all"]
+
+[[driver]]
+id = "mysql"
+name = "MySQL"
+class_name = "com.mysql.cj.jdbc.Driver"
+url_template = "jdbc:mysql://{host}:{port}/{database}"
+default_port = 3306
+dialect = "mysql"
+group = "com.mysql"
+artifact = "mysql-connector-j"
+classifiers = [""]
+
+[[driver]]
+id = "mariadb"
+name = "MariaDB"
+class_name = "org.mariadb.jdbc.Driver"
+url_template = "jdbc:mariadb://{host}:{port}/{database}"
+default_port = 3306
+dialect = "mysql"
+group = "org.mariadb.jdbc"
+artifact = "mariadb-java-client"
+classifiers = [""]
+
+[[driver]]
+id = "oracle"
+name = "Oracle"
+class_name = "oracle.jdbc.OracleDriver"
+url_template = "jdbc:oracle:thin:@//{host}:{port}/{database}"
+default_port = 1521
+dialect = "oracle"
+group = "com.oracle.database.jdbc"
+artifact = "ojdbc11"
+classifiers = [""]
+
+[[driver]]
+id = "mssql"
+name = "SQL Server"
+class_name = "com.microsoft.sqlserver.jdbc.SQLServerDriver"
+url_template = "jdbc:sqlserver://{host}:{port};databaseName={database}"
+default_port = 1433
+dialect = "mssql"
+group = "com.microsoft.sqlserver"
+artifact = "mssql-jdbc"
+classifiers = [""]
+version_suffix = "jre11"
+
+[[driver]]
+id = "h2"
+name = "H2"
+class_name = "org.h2.Driver"
+url_template = "jdbc:h2:{database}"
+default_port = 0
+dialect = "generic"
+group = "com.h2database"
+artifact = "h2"
+classifiers = [""]
+
+[[driver]]
+id = "sqlite"
+name = "SQLite"
+class_name = "org.sqlite.JDBC"
+url_template = "jdbc:sqlite:{database}"
+default_port = 0
+dialect = "generic"
+group = "org.xerial"
+artifact = "sqlite-jdbc"
+classifiers = [""]
+
+[[driver]]
+id = "duckdb"
+name = "DuckDB"
+class_name = "org.duckdb.DuckDBDriver"
+url_template = "jdbc:duckdb:{database}"
+default_port = 0
+dialect = "generic"
+group = "org.duckdb"
+artifact = "duckdb_jdbc"
+classifiers = [""]
