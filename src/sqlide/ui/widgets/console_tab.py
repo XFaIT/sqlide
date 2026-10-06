@@ -281,7 +281,10 @@ class ConsoleTab(ExportActions, Vertical):
                 except DbError as e:
                     self._record(sql, False, monotonic() - started, str(e))
                     self.panel.log_error(f"✖ {e}" + (f"  [{e.sql_state}]" if e.sql_state else ""))
-                    self.app.notify(str(e), title="Query failed", severity="error")
+                    if str(e) == "Cancelled by user":
+                        self.app.notify("Query cancelled", severity="warning")
+                    else:
+                        self.app.notify(str(e), title="Query failed", severity="error")
                     last = "failed"
                     break
                 for w in ex.warnings:

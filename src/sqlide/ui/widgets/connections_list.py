@@ -33,6 +33,10 @@ class ConnectionsList(ListView):
         self.clear()
         for c in connections:
             self.append(ConnectionItem(c))
+        if not connections:
+            self.append(
+                ListItem(Label("No connections yet"), Label("Ctrl+N to add one", classes="dim"))
+            )
         if connections:  # Enter must work without pressing Down first
             self.call_after_refresh(setattr, self, "index", 0)
 
