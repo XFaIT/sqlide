@@ -22,3 +22,9 @@ ConfirmScreen, PasswordPrompt, ProgressScreen, ConnectionEditor { align: center 
 .dialog .row { height: 3; }
 .dialog .row Label { margin-right: 2; padding-top: 1; }
 .dialog .error { color: $error; }
+
+.dialog.viewer { width: 90%; height: 80%; }
+.dialog.viewer TextArea { height: 1fr; }
+.dialog .hint { color: $text-muted; margin-top: 1; }
+ValueViewer, CopyMenu { align: center middle; }
+CopyMenu OptionList { height: auto; max-height: 12; }

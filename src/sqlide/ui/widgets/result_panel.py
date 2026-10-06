@@ -10,8 +10,9 @@ from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.widgets import RichLog, TabbedContent, TabPane
 
-from sqlide.db.result import Column
+from sqlide.db.result import Column, RowSource
 from sqlide.ui.widgets.result_grid import ResultGrid
+from sqlide.ui.widgets.result_view import ResultView
 
 OUTPUT = "output"
 
@@ -48,12 +49,16 @@ class ResultPanel(Vertical):
         self.tabs.active = OUTPUT
 
     async def add_result(
-        self, title: str, columns: Sequence[Column], rows: Sequence[tuple[Any, ...]]
+        self,
+        title: str,
+        columns: Sequence[Column],
+        rows: Sequence[tuple[Any, ...]],
+        source: RowSource | None = None,
+        page_size: int = 500,
     ) -> ResultGrid:
         self._counter += 1
-        grid = ResultGrid()
-        await self.tabs.add_pane(TabPane(title, grid, id=f"r{self._counter}"))
-        grid.load(columns, rows)
+        grid = ResultGrid(columns, rows, source, page_size)
+        await self.tabs.add_pane(TabPane(title, ResultView(grid), id=f"r{self._counter}"))
         return grid
 
     def show_first_result(self) -> None:

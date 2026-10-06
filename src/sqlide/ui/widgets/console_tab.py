@@ -9,6 +9,7 @@ from textual.containers import Vertical
 from sqlide.config.connections import Connection
 from sqlide.db.result import DbError
 from sqlide.db.session import DbSession
+from sqlide.ui.widgets.result_grid import ResultGrid
 from sqlide.ui.widgets.result_panel import ResultPanel
 from sqlide.ui.widgets.sql_editor import SqlEditor
 from sqlide.ui.widgets.status_bar import StatusBar
@@ -78,6 +79,10 @@ class ConsoleTab(Vertical):
             self.app.notify("A query is running (Ctrl+F2 cancels it)", severity="warning")
         else:
             self.run_worker(self._run(message.statements), group="run")
+
+    def on_result_grid_summary(self, message: ResultGrid.Summary) -> None:
+        message.stop()
+        self.status.update_state(message=message.text)
 
     def action_cancel(self) -> None:
         if self.session is not None and self._executing:

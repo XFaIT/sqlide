@@ -72,15 +72,15 @@ async def test_connect_run_statement_under_cursor(make_ws):
         await pilot.press("f5")
         await wait_for(pilot, lambda: len(grids(app)) == 1 and not console(app).running)
         g = grids(app)[0]
-        assert g.row_count == 1 and [str(c.label) for c in g.columns.values()] == ["A", "B"]
-        assert [c.plain for c in g.get_row_at(0)] == ["1", "x"]
+        assert len(g.model) == 1 and [c.name for c in g.model.columns] == ["A", "B"]
+        assert g.model.row(0) == (1, "x")
 
         ed.cursor_location = (2, 5)  # second statement, found by the splitter
         await pilot.pause()
         assert ed.frame_lines == (2, 2)
         await pilot.press("ctrl+j")
         await wait_for(pilot, lambda: console(app).status.message.startswith("3 rows"))
-        assert grids(app)[0].row_count == 3
+        assert len(grids(app)[0].model) == 3
 
 
 async def test_error_is_reported_and_session_survives(make_ws):
@@ -105,7 +105,7 @@ async def test_run_all_and_dml_count(make_ws):
         ed.text = "create table t(a int);\ninsert into t values (1),(2);\nselect * from t"
         await pilot.press("shift+f5")
         await wait_for(pilot, lambda: len(grids(app)) == 1 and not console(app).running)
-        assert grids(app)[0].row_count == 2
+        assert len(grids(app)[0].model) == 2
         assert "2 rows affected" in log_text(app)
 
 
@@ -189,3 +189,25 @@ async def test_cancel_running_query(make_ws):
         await pilot.press("ctrl+f2")
         await wait_for(pilot, lambda: not console(app).running)
         assert "Cancelled" in log_text(app)
+
+
+async def test_paging_through_live_cursor(make_ws):
+    ws = make_ws(Connection("h2mem", "h2", H2_URL.format("e2e6")))
+    ws.settings.fetch_size = 50
+    app = SqlideApp(ws)
+    async with app.run_test(size=(120, 40)) as pilot:
+        await connect_first(pilot, app)
+        ed = console(app).editor
+        ed.text = "select x, x * 2 as dbl from system_range(1, 200)"
+        await pilot.press("f5")
+        await wait_for(pilot, lambda: len(grids(app)) == 1 and not console(app).running)
+        g = grids(app)[0]
+        assert len(g.model) == 50 and g.source is not None
+        assert console(app).status.message.startswith("50 rows (more…)")
+        g.focus()
+        await pilot.press("L")
+        await wait_for(pilot, lambda: g.source is None)
+        assert g.model.total_rows == 200 and g.model.row(199) == (200, 400)
+        assert console(app).status.message == "200 rows"
+        await pilot.press("s", "s")  # sort descending by x
+        assert g.model.value(0, 0) == 200
