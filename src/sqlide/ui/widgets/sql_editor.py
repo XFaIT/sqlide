@@ -28,11 +28,19 @@ COMPLETE_DEBOUNCE_S = 0.05
 
 class SqlEditor(TextArea):
     BINDINGS = [
-        Binding("f5,ctrl+j,ctrl+enter", "run_statement", "Run", priority=True),
-        Binding("shift+f5,ctrl+shift+enter", "run_all", "Run all", priority=True),
-        Binding("ctrl+space,ctrl+@", "complete", "Complete", show=False),
-        Binding("ctrl+alt+l,f7", "format", "Format", show=False),
-        Binding("ctrl+slash,ctrl+underscore,alt+slash", "toggle_comment", "Comment", show=False),
+        Binding("f5,ctrl+j,ctrl+enter", "run_statement", "Run", priority=True, id="editor.run"),
+        Binding(
+            "shift+f5,ctrl+shift+enter", "run_all", "Run all", priority=True, id="editor.run_all"
+        ),
+        Binding("ctrl+space,ctrl+@", "complete", "Complete", show=False, id="editor.complete"),
+        Binding("ctrl+alt+l,f7", "format", "Format", show=False, id="editor.format"),
+        Binding(
+            "ctrl+slash,ctrl+underscore,alt+slash",
+            "toggle_comment",
+            "Comment",
+            show=False,
+            id="editor.toggle_comment",
+        ),
     ]
 
     class RunRequested(Message):

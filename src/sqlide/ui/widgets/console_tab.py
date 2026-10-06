@@ -37,10 +37,10 @@ def one_line(sql: str, limit: int = 100) -> str:
 
 class ConsoleTab(ExportActions, Vertical):
     BINDINGS = [
-        Binding("ctrl+f2", "cancel", "Cancel"),
-        Binding("f8", "toggle_tx", "Auto/Manual tx"),
-        Binding("f9", "commit", "Commit"),
-        Binding("f10", "rollback", "Rollback"),
+        Binding("ctrl+f2", "cancel", "Cancel", id="console.cancel"),
+        Binding("f8", "toggle_tx", "Auto/Manual tx", id="console.toggle_tx"),
+        Binding("f9", "commit", "Commit", id="console.commit"),
+        Binding("f10", "rollback", "Rollback", id="console.rollback"),
     ]
 
     class TitleChanged(Message):

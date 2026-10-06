@@ -7,13 +7,14 @@ from pathlib import Path
 from textual.app import App
 from textual.binding import Binding
 
+from sqlide.config.keymap import load_keymap
 from sqlide.ui.screens.main import MainScreen
 from sqlide.workspace import Workspace
 
 
 class SqlideApp(App):
     CSS_PATH = str(Path(__file__).parent / "ui" / "app.tcss")
-    BINDINGS = [Binding("ctrl+q", "quit", "Quit", priority=True)]
+    BINDINGS = [Binding("ctrl+q", "quit", "Quit", priority=True, id="app.quit")]
 
     def __init__(self, workspace: Workspace | None = None, files: list[Path] | None = None) -> None:
         super().__init__()
@@ -21,6 +22,7 @@ class SqlideApp(App):
         self._files = files or []
 
     def on_mount(self) -> None:
+        self.set_keymap(load_keymap())  # user overrides from keymap.toml
         self.main = MainScreen(self.workspace, self._files)
         self.push_screen(self.main)
 

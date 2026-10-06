@@ -16,6 +16,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = p.add_subparsers(dest="command")
     d = sub.add_parser("doctor", help="check environment (JVM, drivers, config dirs)")
     d.set_defaults(handler=lambda _: _doctor())
+    k = sub.add_parser("keys", help="list rebindable keys (override in keymap.toml)")
+    k.set_defaults(handler=lambda _: _keys())
     driver_cli.register(sub)
     return p
 
@@ -26,7 +28,19 @@ def _doctor() -> int:
     return doctor.run()
 
 
-COMMANDS = {"doctor", "driver"}
+def _keys() -> int:
+    from sqlide.config import paths
+    from sqlide.ui.keymap import catalogue
+
+    print(f'Override in {paths.keymap_file()}  ([keys] id = "key,key")\n')
+    infos = catalogue()
+    width = max(len(i.id) for i in infos)
+    for i in infos:
+        print(f"{i.id:<{width}}  {i.keys:<40}  {i.description}")
+    return 0
+
+
+COMMANDS = {"doctor", "driver", "keys"}
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -286,3 +286,20 @@ async def test_format_and_comment_actions(make_ws):
         await pilot.press("f7")  # unparsable: text untouched
         await pilot.pause()
         assert ed.text == "select from where"
+
+
+async def test_keymap_file_rebinds_run(make_ws, tmp_path, monkeypatch):
+    monkeypatch.setenv("SQLIDE_CONFIG_DIR", str(tmp_path / "cfg"))
+    (tmp_path / "cfg").mkdir()
+    (tmp_path / "cfg" / "keymap.toml").write_text('[keys]\n"editor.run" = "f6"\n')
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("keymap"))))
+    async with app.run_test(size=(120, 40)) as pilot:
+        await connect_first(pilot, app)
+        c = active(app)
+        c.editor.text = "select 5"
+        c.editor.focus()
+        await pilot.press("f5")  # no longer bound
+        await pilot.pause(0.3)
+        assert grids(app) == []
+        await pilot.press("f6")
+        await wait_for(pilot, lambda: len(grids(app)) == 1)

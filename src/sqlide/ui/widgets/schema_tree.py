@@ -16,8 +16,8 @@ ICON_NS, ICON_TABLE, ICON_VIEW = "▣", "▤", "◫"
 
 class SchemaTree(Tree[object]):
     BINDINGS = [
-        Binding("f5", "refresh", "Refresh"),
-        Binding("i", "insert_name", "Insert name"),
+        Binding("f5", "refresh", "Refresh", id="schema.refresh"),
+        Binding("i", "insert_name", "Insert name", id="schema.insert_name"),
     ]
 
     class TableChosen(Message):

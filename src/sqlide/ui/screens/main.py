@@ -35,18 +35,18 @@ EXPECTED_ERRORS = (ConfigError, MavenError, DriverError, DbError, JvmNotFound)
 
 class MainScreen(Screen):
     BINDINGS = [
-        Binding("ctrl+n", "new_connection", "New connection"),
-        Binding("ctrl+t", "new_console", "New console"),
-        Binding("ctrl+f4,alt+w", "close_console", "Close tab"),
-        Binding("ctrl+alt+e,alt+e", "history", "History"),
-        Binding("ctrl+o", "open_file", "Open file"),
-        Binding("ctrl+s", "save_file", "Save"),
-        Binding("alt+right", "tab(1)", "Next tab", show=False),
-        Binding("alt+left", "tab(-1)", "Previous tab", show=False),
-        Binding("alt+1", "focus_sidebar", "Connections", show=False),
-        Binding("alt+4", "focus_schema", "Schema", show=False),
-        Binding("alt+2", "focus_editor", "Editor", show=False),
-        Binding("alt+3", "focus_results", "Results", show=False),
+        Binding("ctrl+n", "new_connection", "New connection", id="main.new_connection"),
+        Binding("ctrl+t", "new_console", "New console", id="main.new_console"),
+        Binding("ctrl+f4,alt+w", "close_console", "Close tab", id="main.close_console"),
+        Binding("ctrl+alt+e,alt+e", "history", "History", id="main.history"),
+        Binding("ctrl+o", "open_file", "Open file", id="main.open_file"),
+        Binding("ctrl+s", "save_file", "Save", id="main.save_file"),
+        Binding("alt+right", "tab(1)", "Next tab", show=False, id="main.next_tab"),
+        Binding("alt+left", "tab(-1)", "Previous tab", show=False, id="main.prev_tab"),
+        Binding("alt+1", "focus_sidebar", "Connections", show=False, id="main.focus_sidebar"),
+        Binding("alt+4", "focus_schema", "Schema", show=False, id="main.focus_schema"),
+        Binding("alt+2", "focus_editor", "Editor", show=False, id="main.focus_editor"),
+        Binding("alt+3", "focus_results", "Results", show=False, id="main.focus_results"),
     ]
 
     def __init__(self, ws: Workspace, files: list[Path] | None = None) -> None:
