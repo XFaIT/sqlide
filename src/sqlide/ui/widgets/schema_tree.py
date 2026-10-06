@@ -8,7 +8,7 @@ from textual.message import Message
 from textual.widgets import Tree
 from textual.widgets.tree import TreeNode
 
-from sqlide.db.metadata import Column, MetaCache, Namespace, Table
+from sqlide.db.metadata import Column, MetaCache, Namespace, Table, is_system_namespace
 from sqlide.db.result import DbError
 
 ICON_NS, ICON_TABLE, ICON_VIEW = "▣", "▤", "◫"
@@ -69,11 +69,25 @@ class SchemaTree(Tree[object]):
             return
         if meta is not self._meta:
             return  # the user switched tabs meanwhile
+        try:
+            current = (await meta.current_namespace()).lower()
+        except DbError:
+            current = ""
+        # the working schema first, system schemas last and dimmed
+        spaces = sorted(
+            spaces, key=lambda n: (is_system_namespace(n.name), n.name.lower() != current)
+        )
         node.remove_children()
+        opened = None
         for ns in spaces:
-            node.add(Text(f"{ICON_NS} {ns.name}"), data=ns)
-        if len(spaces) == 1:
-            node.children[0].expand()
+            style = "dim" if is_system_namespace(ns.name) else ""
+            child = node.add(Text(f"{ICON_NS} {ns.name}", style=style), data=ns)
+            if opened is None and ns.name.lower() == current:
+                opened = child
+        if opened is None and len(spaces) == 1:
+            opened = node.children[0]
+        if opened is not None:
+            opened.expand()
 
     async def _load_tables(self, meta: MetaCache, node: TreeNode, ns: Namespace) -> None:
         self._placeholder(node)

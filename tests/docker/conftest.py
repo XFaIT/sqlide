@@ -65,3 +65,43 @@ async def pg(pg_url):
     await s.open()
     yield s
     await s.close()
+
+
+@pytest.fixture(scope="session")
+def containers():
+    from tests.docker.multi import Containers
+
+    c = Containers()
+    yield c
+    c.close()
+
+
+@pytest.fixture(params=["mysql", "mariadb", "clickhouse", "mssql", "oracle"])
+async def db(request, containers):
+    """Open session on a real server (retries while it finishes initialising)."""
+    import asyncio
+
+    from tests.docker.multi import SPECS
+
+    kind = request.param
+    spec = SPECS[kind]
+    url = containers.url(kind)
+    reg = DriverRegistry(CACHE / "drivers", CACHE / "drivers.toml")
+    if not reg.is_installed(spec.driver):
+        reg.install(spec.driver)
+    loaded = load_driver(reg.get(spec.driver), reg.jar_paths(spec.driver))
+    last: Exception | None = None
+    for _ in range(150):
+        s = DbSession(loaded, url, spec.user, spec.password, dialect=spec.dialect)
+        try:
+            await s.open()
+            break
+        except Exception as e:  # noqa: BLE001 - server still starting
+            last = e
+            await s.close()
+            await asyncio.sleep(2)
+    else:
+        pytest.fail(f"{kind}: could not connect: {last}")
+    s.kind = kind  # type: ignore[attr-defined]
+    yield s
+    await s.close()

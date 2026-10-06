@@ -1,6 +1,6 @@
 import pytest
 
-from sqlide.sql.snippets import qualified_name, quote_ident, select_all
+from sqlide.sql.snippets import is_ddl, qualified_name, quote_ident, select_all
 
 
 @pytest.mark.parametrize(
@@ -36,3 +36,19 @@ def test_qualified_skips_empty_parts():
 )
 def test_select_all(dialect, sql):
     assert select_all("t", dialect, 5) == sql
+
+
+@pytest.mark.parametrize(
+    ("sql", "expected"),
+    [
+        ("create table t(a int)", True),
+        ("  DROP VIEW v", True),
+        ("-- note\n/* x */ alter table t add b int", True),
+        ("select 1", False),
+        ("insert into t values (1)", False),
+        ("created_at", False),
+        ("", False),
+    ],
+)
+def test_is_ddl(sql, expected):
+    assert is_ddl(sql) is expected

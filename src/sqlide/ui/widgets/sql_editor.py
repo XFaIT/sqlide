@@ -208,7 +208,10 @@ class SqlEditor(TextArea):
         strip = super().render_line(y)
         if self._frame is None or not self.show_line_numbers:
             return strip
-        line, _ = self.wrapped_document.offset_to_location(Offset(0, y + self.scroll_offset.y))
+        row = y + self.scroll_offset.y
+        if row >= self.wrapped_document.height:  # empty space below the text: no frame
+            return strip
+        line, _ = self.wrapped_document.offset_to_location(Offset(0, row))
         first, last = self._frame
         if not first <= line <= last:
             return strip

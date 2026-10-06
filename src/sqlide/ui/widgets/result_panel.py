@@ -66,3 +66,8 @@ class ResultPanel(Vertical):
         ids = self.result_pane_ids
         if ids:
             self.tabs.active = ids[0]
+
+    def focus_active(self) -> None:
+        """Put the keyboard on the visible result grid (or the tab strip for the log)."""
+        grids = self.tabs.get_pane(self.tabs.active).query(ResultGrid)
+        (grids.first() if grids else self.tabs).focus()

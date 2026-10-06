@@ -79,3 +79,17 @@ async def test_escape_closes_and_delete_removes(make_ws):
         await pilot.press("escape")
         await wait_for(pilot, lambda: not isinstance(app.screen, HistoryScreen))
         assert console.editor.text == before
+
+
+async def test_alt_letter_keys_work_with_a_real_terminal_character(make_ws):
+    """A terminal sends alt+e with character 'e'; the editor must not swallow it as text."""
+    from textual import events
+
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("hist5"))))
+    async with app.run_test(size=(140, 40)) as pilot:
+        await connect_first(pilot, app)
+        ed = app.screen.console.editor
+        ed.focus()
+        app.post_message(events.Key("alt+e", "e"))
+        await wait_for(pilot, lambda: isinstance(app.screen, HistoryScreen))
+        assert ed.text == ""

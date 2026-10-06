@@ -16,6 +16,7 @@ async def prepare(pilot, app):
     console = app.screen.console
     await console.session.execute("create schema app")
     await console.session.execute("create table app.users (id int primary key, name varchar(9))")
+    console.meta.refresh()
     app.screen.schema.action_refresh()
     return console, app.screen.schema
 

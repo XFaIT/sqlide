@@ -20,6 +20,7 @@ from sqlide.db.metadata import MetaCache
 from sqlide.db.result import DbError
 from sqlide.db.session import DbSession
 from sqlide.sql.context import analyze
+from sqlide.sql.snippets import is_ddl
 from sqlide.ui.widgets.console_export import ExportActions
 from sqlide.ui.widgets.result_grid import ResultGrid
 from sqlide.ui.widgets.result_panel import ResultPanel
@@ -44,6 +45,13 @@ class ConsoleTab(ExportActions, Vertical):
     ]
 
     class TitleChanged(Message):
+        def __init__(self, console: ConsoleTab) -> None:
+            super().__init__()
+            self.console = console
+
+    class SchemaChanged(Message):
+        """A DDL statement ran: cached metadata was dropped, views should reload."""
+
         def __init__(self, console: ConsoleTab) -> None:
             super().__init__()
             self.console = console
@@ -294,6 +302,9 @@ class ConsoleTab(ExportActions, Vertical):
                         last = f"{item.update_count} rows affected"
                         self.panel.log_line(f"  {last}")
                 self._record(sql, True, ex.elapsed_s)
+                if is_ddl(sql) and self.meta is not None:
+                    self.meta.refresh()
+                    self.post_message(self.SchemaChanged(self))
                 self.panel.log_line(f"✔ {ex.elapsed_s * 1000:.0f} ms", "green")
                 last = f"{last} in {ex.elapsed_s * 1000:.0f} ms"
         finally:

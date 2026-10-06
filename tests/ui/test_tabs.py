@@ -291,7 +291,7 @@ async def test_format_and_comment_actions(make_ws):
 async def test_keymap_file_rebinds_run(make_ws, tmp_path, monkeypatch):
     monkeypatch.setenv("SQLIDE_CONFIG_DIR", str(tmp_path / "cfg"))
     (tmp_path / "cfg").mkdir()
-    (tmp_path / "cfg" / "keymap.toml").write_text('[keys]\n"editor.run" = "f6"\n')
+    (tmp_path / "cfg" / "keymap.toml").write_text('[keys]\n"editor.run" = "f4"\n')
     app = SqlideApp(make_ws(Connection("h", "h2", URL.format("keymap"))))
     async with app.run_test(size=(120, 40)) as pilot:
         await connect_first(pilot, app)
@@ -301,5 +301,29 @@ async def test_keymap_file_rebinds_run(make_ws, tmp_path, monkeypatch):
         await pilot.press("f5")  # no longer bound
         await pilot.pause(0.3)
         assert grids(app) == []
-        await pilot.press("f6")
+        await pilot.press("f4")
         await wait_for(pilot, lambda: len(grids(app)) == 1)
+
+
+async def test_enter_connects_without_moving_the_cursor_first(make_ws):
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("firstenter"))))
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        assert app.screen.sidebar.index == 0
+        app.screen.sidebar.focus()
+        await pilot.press("enter")
+        await wait_for(pilot, lambda: active(app).session is not None)
+
+
+async def test_frame_is_not_drawn_below_the_text(make_ws):
+    app = SqlideApp(make_ws())
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        ed = active(app).editor
+        ed.text = "select 1"
+        ed.move_cursor((0, 3))
+        await pilot.pause()
+        assert ed.frame_lines == (0, 0)
+        assert "▏" in ed.render_line(0).text[:6]
+        for row in (1, 5, 20):
+            assert "▏" not in ed.render_line(row).text[:6]

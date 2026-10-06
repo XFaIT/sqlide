@@ -1,5 +1,5 @@
 #side {
-    width: 30;
+    width: 36;
     border-right: solid $primary-darken-2;
 }
 #sidebar { height: 35%; }

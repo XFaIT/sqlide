@@ -33,6 +33,8 @@ class ConnectionsList(ListView):
         self.clear()
         for c in connections:
             self.append(ConnectionItem(c))
+        if connections:  # Enter must work without pressing Down first
+            self.call_after_refresh(setattr, self, "index", 0)
 
     @property
     def highlighted_conn(self) -> Connection | None:

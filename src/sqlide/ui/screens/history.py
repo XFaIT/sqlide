@@ -42,8 +42,8 @@ class HistoryScreen(ModalScreen[HistoryChoice | None]):
         Binding("pageup", "move(-10)", show=False),
         Binding("enter", "insert", "Insert"),
         Binding("f5,ctrl+j", "run", "Run"),
-        Binding("alt+c", "toggle_scope", "This connection only"),
-        Binding("alt+d", "delete", "Delete entry"),
+        Binding("alt+c", "toggle_scope", "This connection only", priority=True),
+        Binding("alt+d", "delete", "Delete entry", priority=True),
     ]
 
     def __init__(self, store: HistoryStore, connection: str = "") -> None:

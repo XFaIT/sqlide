@@ -16,6 +16,19 @@ from sqlide.db.session import DbSession, _db_error
 TABLE_TYPES = ["TABLE", "VIEW", "MATERIALIZED VIEW", "SYSTEM TABLE", "FOREIGN TABLE"]
 
 
+_SYSTEM = {
+    "information_schema", "pg_catalog", "pg_toast", "sys", "mysql", "performance_schema",
+    "system", "sysibm", "sysibmadm", "syscat", "sysstat", "ctxsys", "xdb", "mdsys",
+    "outln", "dbsnmp", "appqossys", "audsys", "gsmadmin_internal", "lbacsys", "ordsys",
+    "wmsys", "dvsys", "olapsys", "ojvmsys", "remote_scheduler_agent", "guest",
+}  # fmt: skip
+
+
+def is_system_namespace(name: str) -> bool:
+    low = name.lower()
+    return low in _SYSTEM or low.startswith(("pg_temp", "pg_toast"))
+
+
 @dataclass(frozen=True)
 class Namespace:
     """A schema, or a catalog on databases that have no schemas (MySQL, ClickHouse)."""

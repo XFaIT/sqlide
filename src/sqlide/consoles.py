@@ -52,9 +52,12 @@ class ConsoleStore:
         """Reserve the next free ``console_N.sql`` for a connection (or no connection)."""
         folder = self.root / safe_dirname(connection or "no-connection")
         folder.mkdir(parents=True, exist_ok=True)
-        n = 1
-        while (folder / f"console_{n}.sql").exists():
-            n += 1
+        used = [
+            int(m.group(1))
+            for f in self.root.glob("*/console_*.sql")
+            if (m := re.fullmatch(r"console_(\d+)\.sql", f.name))
+        ]
+        n = max(used, default=0) + 1  # unique across connections, so tab titles differ
         path = folder / f"console_{n}.sql"
         path.touch()
         return path

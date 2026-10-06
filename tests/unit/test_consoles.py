@@ -7,13 +7,13 @@ def store(tmp_path):
     return ConsoleStore(tmp_path / "consoles", tmp_path / "state.toml")
 
 
-def test_new_console_files_are_numbered_per_connection(tmp_path):
+def test_new_console_files_are_numbered_across_connections(tmp_path):
     s = store(tmp_path)
     a = s.new_console_file("pg-prod")
     b = s.new_console_file("pg-prod")
     c = s.new_console_file("other")
     d = s.new_console_file(None)
-    assert [p.name for p in (a, b, c)] == ["console_1.sql", "console_2.sql", "console_1.sql"]
+    assert [p.name for p in (a, b, c)] == ["console_1.sql", "console_2.sql", "console_3.sql"]
     assert a.parent.name == "pg-prod" and d.parent.name == "no-connection"
     assert all(p.exists() for p in (a, b, c, d))
 

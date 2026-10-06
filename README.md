@@ -58,7 +58,7 @@ in memory until you quit. A connection can instead read it from an environment v
 
 ```toml
 [keys]
-"editor.run" = "f6"
+"editor.run" = "f4"
 ```
 
 | Action | Keys |
@@ -72,7 +72,7 @@ in memory until you quit. A connection can instead read it from an environment v
 | Open / save file | `Ctrl+O` / `Ctrl+S` |
 | History | `Alt+E` |
 | Switch tab | `Alt+←` `Alt+→` |
-| Focus connections / editor / results / schema | `Alt+1` / `Alt+2` / `Alt+3` / `Alt+4` |
+| Focus connections / schema / editor / results | `Alt+C` / `Alt+D` / `Alt+Q` / `Alt+R` (or `F6` / `Shift+F6` to cycle) |
 | Tx: toggle / commit / rollback | `F8` / `F9` / `F10` |
 | Grid: sort / copy / copy as / filter / export | `s` / `Ctrl+C` / `y` / `/` / `e` |
 | Command palette | `Ctrl+P` |
@@ -97,7 +97,10 @@ Override with `SQLIDE_CONFIG_DIR` and `SQLIDE_DATA_DIR`.
   `BEGIN` need `GO` between batches.
 - The schema tree and autocomplete use the tab's own connection, so they wait while a
   query is running (`Ctrl+F2` cancels it).
-- Autocomplete reads cached metadata: press `F5` in the schema tree after DDL.
+- Autocomplete reads cached metadata. DDL you run in the editor refreshes it; changes made by
+  other clients need `F5` in the schema tree.
+- `Alt+1`..`Alt+4` only work in terminals with the kitty keyboard protocol; most terminals
+  deliver them as Mac characters, so use the letter keys or `F6`.
 
 ## Development
 

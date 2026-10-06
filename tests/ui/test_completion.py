@@ -11,6 +11,7 @@ async def setup(pilot, app, name):
     await connect_first(pilot, app)
     console = app.screen.console
     await console.session.execute("create table people (id int, full_name varchar(9))")
+    console.meta.refresh()  # created behind the cache's back
     console.editor.focus()
     await pilot.pause()
     return console, console.editor
@@ -76,3 +77,22 @@ async def test_no_popup_inside_string(make_ws):
         await pilot.press("ctrl+space")
         await pilot.pause(0.3)
         assert not ed.completing
+
+
+async def test_ddl_run_from_the_editor_refreshes_metadata_and_tree(make_ws):
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("ac5"))))
+    async with app.run_test(size=(140, 40)) as pilot:
+        console, ed = await setup(pilot, app, "ac5")
+        await wait_for(
+            pilot, lambda: any("PUBLIC" in str(n.label) for n in app.screen.schema.root.children)
+        )
+        ed.text = "create table fresh_one (a int)"
+        await pilot.press("f5")
+        await wait_for(pilot, lambda: not console.running)
+        tables = [
+            t.name
+            for t in await console.meta.tables(
+                next(n for n in await console.meta.namespaces() if n.name == "PUBLIC")
+            )
+        ]
+        assert "FRESH_ONE" in tables

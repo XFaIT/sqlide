@@ -30,6 +30,7 @@ from sqlide.ui.screens.settings import SettingsScreen
 from sqlide.ui.widgets.connections_list import ConnectionItem, ConnectionsList
 from sqlide.ui.widgets.console_tab import ConsoleTab
 from sqlide.ui.widgets.console_tabs import ConsoleTabs
+from sqlide.ui.widgets.result_grid import ResultGrid
 from sqlide.ui.widgets.schema_tree import SchemaTree
 from sqlide.workspace import Workspace
 
@@ -40,16 +41,42 @@ class MainScreen(Screen):
     BINDINGS = [
         Binding("ctrl+n", "new_connection", "New connection", id="main.new_connection"),
         Binding("ctrl+t", "new_console", "New console", id="main.new_console"),
-        Binding("ctrl+f4,alt+w", "close_console", "Close tab", id="main.close_console"),
-        Binding("ctrl+alt+e,alt+e", "history", "History", id="main.history"),
+        Binding(
+            "ctrl+f4,alt+w", "close_console", "Close tab", priority=True, id="main.close_console"
+        ),
+        Binding("ctrl+alt+e,alt+e", "history", "History", priority=True, id="main.history"),
         Binding("ctrl+o", "open_file", "Open file", id="main.open_file"),
         Binding("ctrl+s", "save_file", "Save", id="main.save_file"),
         Binding("alt+right", "tab(1)", "Next tab", show=False, id="main.next_tab"),
         Binding("alt+left", "tab(-1)", "Previous tab", show=False, id="main.prev_tab"),
-        Binding("alt+1", "focus_sidebar", "Connections", show=False, id="main.focus_sidebar"),
-        Binding("alt+4", "focus_schema", "Schema", show=False, id="main.focus_schema"),
-        Binding("alt+2", "focus_editor", "Editor", show=False, id="main.focus_editor"),
-        Binding("alt+3", "focus_results", "Results", show=False, id="main.focus_results"),
+        # Alt+digits never reach us in most terminals (Textual maps ESC+digit to Mac Option
+        # characters), so each focus action also has an Alt+letter, and F6 cycles the panes.
+        Binding(
+            "alt+c,alt+1",
+            "focus_sidebar",
+            "Connections",
+            False,
+            priority=True,
+            id="main.focus_sidebar",
+        ),
+        Binding(
+            "alt+d,alt+4", "focus_schema", "Schema", False, priority=True, id="main.focus_schema"
+        ),
+        Binding(
+            "alt+q,alt+2", "focus_editor", "Editor", False, priority=True, id="main.focus_editor"
+        ),
+        Binding(
+            "alt+r,alt+3", "focus_results", "Results", False, priority=True, id="main.focus_results"
+        ),
+        Binding("f6", "cycle_focus(1)", "Next pane", False, priority=True, id="main.next_pane"),
+        Binding(
+            "shift+f6",
+            "cycle_focus(-1)",
+            "Previous pane",
+            False,
+            priority=True,
+            id="main.prev_pane",
+        ),
     ]
 
     def __init__(self, ws: Workspace, files: list[Path] | None = None) -> None:
@@ -108,6 +135,11 @@ class MainScreen(Screen):
         if console is not None:
             self.schema.show(console.meta, console.conn_name)
 
+    def on_console_tab_schema_changed(self, msg: ConsoleTab.SchemaChanged) -> None:
+        msg.stop()
+        if msg.console is self.tabs.active_console:
+            self.schema.show(msg.console.meta, msg.console.conn_name)
+
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         if event.tabbed_content is self.tabs:  # not the result tabs inside a console
             self._sync_subtitle()
@@ -117,6 +149,19 @@ class MainScreen(Screen):
         self.app.notify(str(e).splitlines()[0], title="Error", severity="error", timeout=10)
 
     # --- focus ---
+    def action_cycle_focus(self, step: int) -> None:
+        """F6: connections -> schema tree -> editor -> results."""
+        panel = self.console.panel
+        grids = panel.tabs.get_pane(panel.tabs.active).query(ResultGrid)
+        order = [
+            self.sidebar,
+            self.schema,
+            self.console.editor,
+            grids.first() if grids else panel.tabs,
+        ]
+        current = next((i for i, w in enumerate(order) if w is self.focused), -1)
+        order[(current + step) % len(order)].focus()
+
     def action_focus_sidebar(self) -> None:
         self.sidebar.focus()
 
@@ -143,7 +188,7 @@ class MainScreen(Screen):
         self.console.editor.focus()
 
     def action_focus_results(self) -> None:
-        self.console.panel.tabs.focus()
+        self.console.panel.focus_active()
 
     # --- tabs and files ---
     def action_tab(self, step: int) -> None:

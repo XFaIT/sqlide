@@ -31,3 +31,14 @@ def select_all(table: str, dialect: str, limit: int = 100) -> str:
     if dialect == "oracle":
         return f"SELECT * FROM {table} FETCH FIRST {limit} ROWS ONLY"
     return f"SELECT * FROM {table} LIMIT {limit}"
+
+
+_LEADING_NOISE = re.compile(r"^(?:\s+|--[^\n]*(?:\n|$)|/\*.*?\*/)*", re.S)
+_DDL_WORDS = frozenset({"CREATE", "ALTER", "DROP", "TRUNCATE", "RENAME", "COMMENT"})
+
+
+def is_ddl(sql: str) -> bool:
+    """True when the statement changes the schema (so cached metadata is stale)."""
+    rest = _LEADING_NOISE.sub("", sql, count=1)
+    word = re.match(r"[A-Za-z]+", rest)
+    return bool(word) and word.group().upper() in _DDL_WORDS  # type: ignore[union-attr]

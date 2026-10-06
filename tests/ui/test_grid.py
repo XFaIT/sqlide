@@ -282,3 +282,47 @@ async def test_vertical_scroll_follows_cursor_and_sticky_header():
         assert "id" in line(g, 0)  # header stays on screen
         assert any("r99" in line(g, y) for y in range(1, 10))
         assert dt.date  # keep import used
+
+
+async def test_alt3_focuses_the_visible_grid(make_ws):
+    from sqlide.app import SqlideApp
+    from sqlide.config.connections import Connection
+    from tests.ui.helpers import connect_first, grids, wait_for
+
+    app = SqlideApp(make_ws(Connection("h", "h2", "jdbc:h2:mem:focus3;DB_CLOSE_DELAY=-1")))
+    async with app.run_test(size=(120, 40)) as pilot:
+        await connect_first(pilot, app)
+        c = app.screen.console
+        c.editor.text = "select 1 as a"
+        c.editor.focus()
+        await pilot.press("f5")
+        await wait_for(pilot, lambda: len(grids(app)) == 1 and not c.running)
+        await pilot.press("alt+3")
+        await pilot.pause()
+        assert app.focused is grids(app)[0]
+
+
+async def test_f6_cycles_panes_and_alt_letters_focus(make_ws):
+    from textual import events
+
+    from sqlide.app import SqlideApp
+    from sqlide.config.connections import Connection
+    from tests.ui.helpers import connect_first
+
+    app = SqlideApp(make_ws(Connection("h", "h2", "jdbc:h2:mem:cycle;DB_CLOSE_DELAY=-1")))
+    async with app.run_test(size=(120, 40)) as pilot:
+        await connect_first(pilot, app)
+        main = app.screen
+        main.sidebar.focus()
+        await pilot.press("f6")
+        assert app.focused is main.schema
+        await pilot.press("f6")
+        assert app.focused is main.console.editor
+        await pilot.press("shift+f6")
+        assert app.focused is main.schema
+        app.post_message(events.Key("alt+q", "q"))  # what a real terminal sends
+        await pilot.pause()
+        assert app.focused is main.console.editor
+        app.post_message(events.Key("alt+c", "c"))
+        await pilot.pause()
+        assert app.focused is main.sidebar
