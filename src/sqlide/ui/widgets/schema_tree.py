@@ -81,7 +81,7 @@ class SchemaTree(Tree[object]):
         opened = None
         for ns in spaces:
             style = "dim" if is_system_namespace(ns.name) else ""
-            child = node.add(Text(f"{ICON_NS} {ns.name}", style=style), data=ns)
+            child = node.add(Text(f"{ICON_NS} {ns.name or 'main'}", style=style), data=ns)
             if opened is None and ns.name.lower() == current:
                 opened = child
         if opened is None and len(spaces) == 1:

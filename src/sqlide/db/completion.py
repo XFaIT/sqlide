@@ -37,7 +37,7 @@ async def _resolve(meta: MetaCache, ref_parts: tuple[str, ...]) -> Table | None:
         ns = await _find_namespace(meta, ref_parts[-2])
     else:
         current = await meta.current_namespace()
-        ns = await _find_namespace(meta, current) if current else None
+        ns = await _find_namespace(meta, current)
     if ns is None:
         return None
     return next((t for t in await meta.tables(ns) if _same(t.name, name)), None)
@@ -103,7 +103,7 @@ async def _from_metadata(ctx: Context, meta: MetaCache, dialect: str) -> list[Ca
     out: list[Candidate] = []
     if ctx.kind == "table":
         current = await meta.current_namespace()
-        ns = await _find_namespace(meta, current) if current else None
+        ns = await _find_namespace(meta, current)
         if ns is not None:
             out += _table_candidates(await meta.tables(ns), dialect)
         out += [Candidate(quote_ident(n.name, dialect), "schema") for n in spaces]

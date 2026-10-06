@@ -61,6 +61,13 @@ class Column:
     primary_key: bool = False
 
 
+def _scope(name: str, is_catalog: bool) -> tuple[str | None, str | None]:
+    """(catalog, schema) arguments for DatabaseMetaData; "" means no filter at all."""
+    if not name:
+        return None, None
+    return (name, None) if is_catalog else (None, name)
+
+
 def _rows(rs: Any, *cols: str) -> list[tuple[Any, ...]]:
     out = []
     try:
@@ -106,7 +113,9 @@ class MetaCache:
             if schemas:
                 return [Namespace(s) for s in sorted(schemas, key=str.lower)]
             cats = [r[0] for r in _rows(md.getCatalogs(), "TABLE_CAT")]
-            return [Namespace(c, True) for c in sorted(cats, key=str.lower)]
+            if cats:
+                return [Namespace(c, True) for c in sorted(cats, key=str.lower)]
+            return [Namespace("")]  # SQLite & co: no schemas at all, tables are just there
         except jpype.JException as e:
             raise _db_error(e) from e
 
@@ -155,7 +164,7 @@ class MetaCache:
     def _load_columns(conn: Any, t: Table) -> list[Column]:
         try:
             md = conn.getMetaData()
-            cat, sch = (t.namespace, None) if t.is_catalog else (None, t.namespace)
+            cat, sch = _scope(t.namespace, t.is_catalog)
             pks = {r[0] for r in _rows(md.getPrimaryKeys(cat, sch, t.name), "COLUMN_NAME")}
             rows = _rows(
                 md.getColumns(cat, sch, t.name, "%"), "COLUMN_NAME", "TYPE_NAME", "IS_NULLABLE"
