@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 
 from sqlide.jvm import locate
@@ -5,8 +6,10 @@ from sqlide.jvm import locate
 
 def make_jdk(home: Path, version: str = "21.0.1") -> Path:
     (home / "lib/server").mkdir(parents=True)
+    (home / "bin/server").mkdir(parents=True)
     (home / "lib/server/libjvm.so").touch()
     (home / "lib/server/libjvm.dylib").touch()
+    (home / "bin/server/jvm.dll").touch()
     (home / "release").write_text(f'JAVA_VERSION="{version}"\n')
     return home
 
@@ -20,6 +23,8 @@ def test_java_home_wins(tmp_path, monkeypatch):
 def test_too_old_java_is_reported(tmp_path, monkeypatch):
     monkeypatch.setenv("JAVA_HOME", str(make_jdk(tmp_path / "old", "1.8.0_392")))
     monkeypatch.setattr("shutil.which", lambda name: None)
+    only_env = [Path(os.environ["JAVA_HOME"])]  # real JDKs on the machine must not leak in
+    monkeypatch.setattr(locate, "_candidates", lambda: only_env)
     try:
         locate.locate_jvm()
     except locate.JvmNotFound as e:

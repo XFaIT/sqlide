@@ -18,6 +18,15 @@ CMD_TIMEOUT_S = 10
 Prompt = Callable[[Connection], str | None]  # None = user cancelled
 
 
+def _split(cmd: str) -> list[str]:
+    if os.name != "nt":
+        return shlex.split(cmd)
+    # non-POSIX split keeps the quotes around tokens; strip them like CreateProcess would
+    return [
+        t[1:-1] if len(t) > 1 and t[0] == t[-1] == '"' else t for t in shlex.split(cmd, posix=False)
+    ]
+
+
 class PasswordResolver:
     def __init__(self) -> None:
         self._cache: dict[str, str] = {}
@@ -52,7 +61,7 @@ class PasswordResolver:
             return None
         try:
             res = subprocess.run(
-                shlex.split(conn.password_cmd, posix=os.name != "nt"),
+                _split(conn.password_cmd),
                 capture_output=True,
                 text=True,
                 timeout=CMD_TIMEOUT_S,

@@ -14,13 +14,16 @@ async def wait_for(pilot, cond, timeout=15.0):
 
 
 def console(app):
-    return app.screen.console
+    """The active console, even while a dialog is on top of the main screen."""
+    main = next(s for s in app.screen_stack if hasattr(s, "console"))
+    return main.console
 
 
 async def connect_first(pilot, app):
     """Select the first saved connection in the sidebar and wait until it is connected."""
     await pilot.pause()
     app.screen.sidebar.index = 0
+    app.screen.sidebar.focus()
     await pilot.press("enter")
     await wait_for(pilot, lambda: console(app).session is not None)
 

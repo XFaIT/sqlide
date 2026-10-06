@@ -308,8 +308,7 @@ async def test_keymap_file_rebinds_run(make_ws, tmp_path, monkeypatch):
 async def test_enter_connects_without_moving_the_cursor_first(make_ws):
     app = SqlideApp(make_ws(Connection("h", "h2", URL.format("firstenter"))))
     async with app.run_test(size=(120, 40)) as pilot:
-        await pilot.pause()
-        assert app.screen.sidebar.index == 0
+        await wait_for(pilot, lambda: app.screen.sidebar.index == 0)
         app.screen.sidebar.focus()
         await pilot.press("enter")
         await wait_for(pilot, lambda: active(app).session is not None)

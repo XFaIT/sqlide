@@ -1,3 +1,4 @@
+import os
 import sys
 
 import pytest
@@ -48,7 +49,8 @@ def test_connection_store_roundtrip_and_private_mode():
     assert set(got) == {"pg", "ch"}
     assert got["pg"].url.endswith("h2/db")
     assert got["ch"].properties == {"ssl": "true"}
-    assert oct(store.path.stat().st_mode & 0o777) == "0o600"
+    if os.name != "nt":  # Windows has no POSIX modes
+        assert oct(store.path.stat().st_mode & 0o777) == "0o600"
     store.remove("ch")
     assert [c.name for c in store.load()] == ["pg"]
 
