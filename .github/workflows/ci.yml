@@ -27,4 +27,13 @@ jobs:
       - run: uv run ruff check
       - run: uv run ruff format --check
       - run: uv run pyright
-      - run: uv run pytest -q
+      - name: Tests
+        shell: bash
+        run: uv run pytest -q --tb=short -p no:cacheprovider 2>&1 | tee pytest.log; exit "${PIPESTATUS[0]}"
+      - name: Show failures as annotations
+        if: failure()
+        shell: bash
+        run: |
+          grep -E "^(FAILED|ERROR)|Error|assert " pytest.log | head -30 | while IFS= read -r line; do
+            echo "::error::${line:0:400}"
+          done
