@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from time import monotonic
 from typing import cast
 
 from textual.app import ComposeResult
@@ -249,6 +250,12 @@ class ConsoleTab(ExportActions, Vertical):
             self.session.cancel()
             self.status.update_state(message="cancelling…")
 
+    def _record(self, sql: str, ok: bool, elapsed_s: float, error: str = "") -> None:
+        try:
+            self.ws.history.add(self.conn_name, sql, ok, round(elapsed_s * 1000), error)
+        except Exception as e:  # history must never break running queries
+            self.app.log.warning(f"history: {e}")
+
     async def _run(self, statements: list[str]) -> None:
         session = self.session
         assert session is not None
@@ -260,9 +267,11 @@ class ConsoleTab(ExportActions, Vertical):
         try:
             for sql in statements:
                 self.panel.log_line(f"▶ {one_line(sql)}", "bold")
+                started = monotonic()
                 try:
                     ex = await session.execute(sql, self.ws.settings.fetch_size)
                 except DbError as e:
+                    self._record(sql, False, monotonic() - started, str(e))
                     self.panel.log_error(f"✖ {e}" + (f"  [{e.sql_state}]" if e.sql_state else ""))
                     self.app.notify(str(e), title="Query failed", severity="error")
                     last = "failed"
@@ -284,6 +293,7 @@ class ConsoleTab(ExportActions, Vertical):
                     else:
                         last = f"{item.update_count} rows affected"
                         self.panel.log_line(f"  {last}")
+                self._record(sql, True, ex.elapsed_s)
                 self.panel.log_line(f"✔ {ex.elapsed_s * 1000:.0f} ms", "green")
                 last = f"{last} in {ex.elapsed_s * 1000:.0f} ms"
         finally:

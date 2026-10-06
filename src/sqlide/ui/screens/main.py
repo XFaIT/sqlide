@@ -23,6 +23,7 @@ from sqlide.jvm.runtime import ensure_jvm
 from sqlide.sql.snippets import qualified_name, select_all
 from sqlide.ui.screens.connection_editor import ConnectionEditor
 from sqlide.ui.screens.dialogs import ConfirmScreen, PasswordPrompt, PathPrompt, ProgressScreen
+from sqlide.ui.screens.history import HistoryScreen
 from sqlide.ui.widgets.connections_list import ConnectionItem, ConnectionsList
 from sqlide.ui.widgets.console_tab import ConsoleTab
 from sqlide.ui.widgets.console_tabs import ConsoleTabs
@@ -37,6 +38,7 @@ class MainScreen(Screen):
         Binding("ctrl+n", "new_connection", "New connection"),
         Binding("ctrl+t", "new_console", "New console"),
         Binding("ctrl+f4,alt+w", "close_console", "Close tab"),
+        Binding("ctrl+alt+e,alt+e", "history", "History"),
         Binding("ctrl+o", "open_file", "Open file"),
         Binding("ctrl+s", "save_file", "Save"),
         Binding("alt+right", "tab(1)", "Next tab", show=False),
@@ -208,6 +210,20 @@ class MainScreen(Screen):
             self.app.notify(str(e), title="Cannot save", severity="error")
             return
         self.app.notify(f"Saved {console.path}")
+
+    # --- history ---
+    @work(exclusive=True, group="dialog")
+    async def action_history(self) -> None:
+        console = self.console
+        choice = await self.app.push_screen_wait(HistoryScreen(self.ws.history, console.conn_name))
+        if choice is None:
+            return
+        editor = console.editor
+        editor.move_cursor(editor.document.end)
+        editor.insert(("\n\n" if editor.text.strip() else "") + choice.sql + ";")
+        editor.focus()
+        if choice.run:
+            console.run_statements([choice.sql])
 
     # --- connection CRUD ---
     @work(exclusive=True, group="dialog")

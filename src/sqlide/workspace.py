@@ -15,6 +15,7 @@ from sqlide.consoles import ConsoleStore
 from sqlide.db.factory import create_session
 from sqlide.db.session import DbSession
 from sqlide.drivers.registry import DriverDef, DriverRegistry
+from sqlide.history import HistoryStore
 from sqlide.jvm.runtime import ensure_jvm
 
 
@@ -26,12 +27,14 @@ class Workspace:
         resolver: PasswordResolver | None = None,
         settings: Settings | None = None,
         consoles: ConsoleStore | None = None,
+        history: HistoryStore | None = None,
     ) -> None:
         self.store = store or ConnectionStore()
         self.registry = registry or DriverRegistry()
         self.resolver = resolver or PasswordResolver()
         self.settings = settings or load_settings()
         self.consoles = consoles or ConsoleStore()
+        self.history = history or HistoryStore(limit=self.settings.history_limit)
 
     # --- connections ---
     def connections(self) -> list[Connection]:
