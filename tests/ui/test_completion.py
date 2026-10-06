@@ -1,0 +1,78 @@
+"""Autocomplete popup: opens on Ctrl+Space and after a dot, filters, accepts."""
+
+from sqlide.app import SqlideApp
+from sqlide.config.connections import Connection
+from tests.ui.helpers import connect_first, wait_for
+
+URL = "jdbc:h2:mem:{};DB_CLOSE_DELAY=-1"
+
+
+async def setup(pilot, app, name):
+    await connect_first(pilot, app)
+    console = app.screen.console
+    await console.session.execute("create table people (id int, full_name varchar(9))")
+    console.editor.focus()
+    await pilot.pause()
+    return console, console.editor
+
+
+def popup(editor):
+    return editor._popup
+
+
+async def type_text(pilot, text):
+    for ch in text:
+        await pilot.press(ch if ch != "." else "full_stop")
+
+
+async def test_ctrl_space_opens_and_enter_accepts(make_ws):
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("ac1"))))
+    async with app.run_test(size=(140, 40)) as pilot:
+        _, ed = await setup(pilot, app, "ac1")
+        await type_text(pilot, "select * from peo")
+        await pilot.press("ctrl+space")
+        await wait_for(pilot, lambda: ed.completing)
+        assert popup(ed).current.text == "PEOPLE"
+        await pilot.press("enter")
+        await pilot.pause()
+        assert ed.text == "select * from PEOPLE"
+        assert not ed.completing
+
+
+async def test_dot_opens_alias_columns_and_typing_filters(make_ws):
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("ac2"))))
+    async with app.run_test(size=(140, 40)) as pilot:
+        _, ed = await setup(pilot, app, "ac2")
+        ed.text = "select p from people p"
+        ed.move_cursor((0, 8))
+        await pilot.press("full_stop")
+        await wait_for(pilot, lambda: ed.completing)
+        assert [c.text for c in popup(ed)._items] == ["ID", "FULL_NAME"]
+        await pilot.press("f")
+        await wait_for(pilot, lambda: [c.text for c in popup(ed)._items] == ["FULL_NAME"])
+        await pilot.press("tab")
+        await pilot.pause()
+        assert ed.text == "select p.FULL_NAME from people p"
+
+
+async def test_escape_closes_without_changing_text(make_ws):
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("ac3"))))
+    async with app.run_test(size=(140, 40)) as pilot:
+        _, ed = await setup(pilot, app, "ac3")
+        await type_text(pilot, "sel")
+        await pilot.press("ctrl+space")
+        await wait_for(pilot, lambda: ed.completing)
+        await pilot.press("down")
+        await pilot.press("escape")
+        await pilot.pause()
+        assert not ed.completing and ed.text == "sel"
+
+
+async def test_no_popup_inside_string(make_ws):
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("ac4"))))
+    async with app.run_test(size=(140, 40)) as pilot:
+        _, ed = await setup(pilot, app, "ac4")
+        await type_text(pilot, "select 'sel")
+        await pilot.press("ctrl+space")
+        await pilot.pause(0.3)
+        assert not ed.completing

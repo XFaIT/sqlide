@@ -65,11 +65,13 @@ class MetaCache:
     def __init__(self, session: DbSession) -> None:
         self._s = session
         self._namespaces: list[Namespace] | None = None
+        self._current: str | None = None
         self._tables: dict[str, list[Table]] = {}
         self._columns: dict[tuple[str, str], list[Column]] = {}
 
     def refresh(self) -> None:
         self._namespaces = None
+        self._current = None
         self._tables.clear()
         self._columns.clear()
 
@@ -90,6 +92,23 @@ class MetaCache:
             return [Namespace(c, True) for c in sorted(cats, key=str.lower)]
         except jpype.JException as e:
             raise _db_error(e) from e
+
+    async def current_namespace(self) -> str:
+        """The schema (or catalog) unqualified names resolve to; "" when unknown."""
+        if self._current is None:
+            self._current = await self._s.call(self._load_current)
+        return self._current
+
+    @staticmethod
+    def _load_current(conn: Any) -> str:
+        for getter in (conn.getSchema, conn.getCatalog):
+            try:
+                value = getter()
+            except jpype.JException:
+                continue
+            if value is not None:
+                return str(value)
+        return ""
 
     async def tables(self, ns: Namespace) -> list[Table]:
         if ns.name not in self._tables:

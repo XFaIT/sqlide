@@ -14,9 +14,11 @@ from textual.widgets import TextArea
 
 from sqlide.config.connections import Connection
 from sqlide.consoles import CONSOLE, FILE, TabState
+from sqlide.db.completion import candidates
 from sqlide.db.metadata import MetaCache
 from sqlide.db.result import DbError
 from sqlide.db.session import DbSession
+from sqlide.sql.context import analyze
 from sqlide.ui.widgets.console_export import ExportActions
 from sqlide.ui.widgets.result_grid import ResultGrid
 from sqlide.ui.widgets.result_panel import ResultPanel
@@ -201,6 +203,22 @@ class ConsoleTab(ExportActions, Vertical):
             return
         self.panel.log_line("Committed" if commit else "Rolled back", "green")
         self._refresh_tx(message="committed" if commit else "rolled back")
+
+    # --- autocomplete ---
+    def on_sql_editor_completion_requested(self, message: SqlEditor.CompletionRequested) -> None:
+        message.stop()
+        self.run_worker(self._complete(message), group="complete", exclusive=True)
+
+    async def _complete(self, req: SqlEditor.CompletionRequested) -> None:
+        dialect = self.editor.dialect
+        ctx = analyze(req.text, req.offset, dialect)
+        if ctx is None or (not ctx.prefix and not ctx.qualifier and not req.manual):
+            self.editor.hide_completions()
+            return
+        items = await candidates(ctx, self.meta, dialect)
+        if self.editor._cursor_index() != req.offset:  # the user typed on; a newer request follows
+            return
+        self.editor.show_completions(items, ctx.replace_len)
 
     # --- execution ---
     def on_sql_editor_run_requested(self, message: SqlEditor.RunRequested) -> None:
