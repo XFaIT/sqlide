@@ -33,3 +33,9 @@ ExportScreen { align: center middle; }
 ExportScreen RadioSet { height: auto; }
 ExportScreen .row Input { width: 12; }
 ExportScreen #table_name { width: 40; }
+
+#tabs { width: 1fr; }
+ConsoleTabs > ContentSwitcher { height: 1fr; }
+ConsoleTabs TabPane { padding: 0; height: 1fr; }
+ConsoleTab { height: 1fr; }
+PathPrompt { align: center middle; }

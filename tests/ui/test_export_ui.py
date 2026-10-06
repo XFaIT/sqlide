@@ -9,7 +9,7 @@ from sqlide.app import SqlideApp
 from sqlide.config.connections import Connection
 from sqlide.ui.screens.export_dialog import ExportScreen
 from sqlide.ui.screens.main import MainScreen
-from tests.ui.test_app_e2e import connect_first, console, grids, make_ws, wait_for  # noqa: F401
+from tests.ui.helpers import connect_first, console, grids, wait_for
 
 URL = "jdbc:h2:mem:{};DB_CLOSE_DELAY=-1"
 
@@ -29,7 +29,7 @@ async def open_export(pilot, app):
     return app.screen
 
 
-async def test_export_whole_result_reruns_query_and_streams(make_ws, tmp_path):  # noqa: F811
+async def test_export_whole_result_reruns_query_and_streams(make_ws, tmp_path):
     ws = make_ws(Connection("h", "h2", URL.format("ex1")))
     ws.settings.fetch_size = 50
     app = SqlideApp(ws)
@@ -49,7 +49,7 @@ async def test_export_whole_result_reruns_query_and_streams(make_ws, tmp_path): 
         assert len(grid.model) == 50 and grid.source is not None  # the grid's cursor untouched
 
 
-async def test_export_view_respects_sort_and_filter_and_swaps_extension(make_ws, tmp_path):  # noqa: F811
+async def test_export_view_respects_sort_and_filter_and_swaps_extension(make_ws, tmp_path):
     ws = make_ws(Connection("h", "h2", URL.format("ex2")))
     app = SqlideApp(ws)
     async with app.run_test(size=(120, 50)) as pilot:
@@ -84,7 +84,7 @@ async def test_export_view_respects_sort_and_filter_and_swaps_extension(make_ws,
         ]
 
 
-async def test_export_selection_scope(make_ws, tmp_path):  # noqa: F811
+async def test_export_selection_scope(make_ws, tmp_path):
     app = SqlideApp(make_ws(Connection("h", "h2", URL.format("ex3"))))
     async with app.run_test(size=(120, 50)) as pilot:
         await connect_first(pilot, app)
@@ -105,7 +105,7 @@ async def test_export_selection_scope(make_ws, tmp_path):  # noqa: F811
         ]  # fmt: skip
 
 
-async def test_overwrite_is_guarded(make_ws, tmp_path):  # noqa: F811
+async def test_overwrite_is_guarded(make_ws, tmp_path):
     app = SqlideApp(make_ws(Connection("h", "h2", URL.format("ex4"))))
     existing = tmp_path / "keep.csv"
     existing.write_text("precious")
@@ -127,7 +127,7 @@ async def test_overwrite_is_guarded(make_ws, tmp_path):  # noqa: F811
         assert existing.read_text().splitlines() == ["A", "1"]
 
 
-async def test_export_failure_is_reported_not_fatal(make_ws, tmp_path):  # noqa: F811
+async def test_export_failure_is_reported_not_fatal(make_ws, tmp_path):
     app = SqlideApp(make_ws(Connection("h", "h2", URL.format("ex5"))))
     blocker = tmp_path / "file"
     blocker.write_text("x")  # a file where a directory is needed
@@ -142,7 +142,7 @@ async def test_export_failure_is_reported_not_fatal(make_ws, tmp_path):  # noqa:
         assert isinstance(app.screen, MainScreen)
 
 
-async def test_export_dialog_cancel(make_ws):  # noqa: F811
+async def test_export_dialog_cancel(make_ws):
     app = SqlideApp(make_ws(Connection("h", "h2", URL.format("ex6"))))
     async with app.run_test(size=(120, 50)) as pilot:
         await connect_first(pilot, app)

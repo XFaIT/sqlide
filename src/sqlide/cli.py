@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from sqlide import __version__
 from sqlide.drivers import cli as driver_cli
@@ -25,13 +26,23 @@ def _doctor() -> int:
     return doctor.run()
 
 
+COMMANDS = {"doctor", "driver"}
+
+
 def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if argv and argv[0] not in COMMANDS and not argv[0].startswith("-"):
+        return _run_tui([Path(a) for a in argv])  # `sqlide query.sql other.sql`
     args = build_parser().parse_args(argv)
     if getattr(args, "handler", None):
         return args.handler(args)
+    return _run_tui([])
+
+
+def _run_tui(files: list[Path]) -> int:
     from sqlide.app import SqlideApp
 
-    SqlideApp().run()
+    SqlideApp(files=files).run()
     return 0
 
 

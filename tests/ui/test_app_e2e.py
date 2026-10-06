@@ -2,60 +2,17 @@
 
 import asyncio
 
-import pytest
-from textual.widgets import Input, RichLog
+from textual.widgets import Input
 
 from sqlide.app import SqlideApp
-from sqlide.config.connections import Connection, ConnectionStore
-from sqlide.config.settings import Settings
+from sqlide.config.connections import Connection
 from sqlide.drivers.registry import DriverRegistry
 from sqlide.ui.screens.connection_editor import ConnectionEditor
 from sqlide.ui.screens.dialogs import ConfirmScreen, PasswordPrompt
 from sqlide.ui.screens.main import MainScreen
-from sqlide.ui.widgets.result_grid import ResultGrid
-from sqlide.workspace import Workspace
-from tests.conftest import CACHE
+from tests.ui.helpers import connect_first, console, grids, log_text, wait_for
 
 H2_URL = "jdbc:h2:mem:{};DB_CLOSE_DELAY=-1"
-
-
-@pytest.fixture
-def make_ws(tmp_path, h2):
-    def make(*conns: Connection, registry: DriverRegistry | None = None) -> Workspace:
-        store = ConnectionStore(tmp_path / "connections.toml")
-        store.save(list(conns))
-        reg = registry or DriverRegistry(CACHE / "drivers", tmp_path / "drivers.toml")
-        return Workspace(store, reg, settings=Settings())
-
-    return make
-
-
-async def wait_for(pilot, cond, timeout=15.0):
-    for _ in range(int(timeout / 0.05)):
-        if cond():
-            return
-        await pilot.pause(0.05)
-    raise AssertionError("condition not met in time")
-
-
-def console(app):
-    return app.screen.console
-
-
-async def connect_first(pilot, app):
-    await pilot.pause()
-    app.screen.sidebar.index = 0
-    await pilot.press("enter")
-    await wait_for(pilot, lambda: console(app).session is not None)
-
-
-def grids(app):
-    return list(app.screen.query(ResultGrid))
-
-
-def log_text(app) -> str:
-    log = app.screen.query_one("#log", RichLog)
-    return "\n".join(line.text for line in log.lines)
 
 
 async def test_connect_run_statement_under_cursor(make_ws):

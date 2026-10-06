@@ -150,6 +150,9 @@ class DbSession:
         def shut(conn: Any) -> None:
             for c in list(self._cursors):
                 c._close_sync()
+            if self.pending_tx:  # some drivers (Oracle) would commit on close
+                with contextlib.suppress(jpype.JException):
+                    conn.rollback()
             with contextlib.suppress(jpype.JException):
                 conn.close()
 

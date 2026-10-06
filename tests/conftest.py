@@ -26,3 +26,10 @@ async def session(h2):
     await s.open()
     yield s
     await s.close()
+
+
+@pytest.fixture(autouse=True)
+def _isolated_user_dirs(tmp_path, monkeypatch):
+    """No test may touch the real ~/.config or ~/.local/share of the developer."""
+    monkeypatch.setenv("SQLIDE_CONFIG_DIR", str(tmp_path / "_cfg"))
+    monkeypatch.setenv("SQLIDE_DATA_DIR", str(tmp_path / "_data"))

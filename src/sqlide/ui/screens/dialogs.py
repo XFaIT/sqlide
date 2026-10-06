@@ -75,3 +75,36 @@ class ProgressScreen(ModalScreen[None]):
 
     def advance(self, done: int, total: int | None) -> None:
         self.query_one("#bar", ProgressBar).update(total=total, progress=done)
+
+
+class PathPrompt(ModalScreen[str | None]):
+    """Ask for a file path (open / save as)."""
+
+    BINDINGS = [Binding("escape", "cancel", "Cancel")]
+
+    def __init__(self, title: str, default: str = "", ok: str = "OK") -> None:
+        super().__init__()
+        self._title, self._default, self._ok = title, default, ok
+
+    def compose(self) -> ComposeResult:
+        with Vertical(classes="dialog wide"):
+            yield Label(self._title)
+            yield Input(self._default, id="path")
+            with Horizontal(classes="buttons"):
+                yield Button(self._ok, variant="primary", id="ok")
+                yield Button("Cancel", id="cancel")
+
+    def on_mount(self) -> None:
+        self.query_one("#path", Input).focus()
+
+    def _value(self) -> str | None:
+        return self.query_one("#path", Input).value.strip() or None
+
+    def on_input_submitted(self, _: Input.Submitted) -> None:
+        self.dismiss(self._value())
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        self.dismiss(self._value() if event.button.id == "ok" else None)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)

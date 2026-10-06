@@ -11,6 +11,7 @@ from collections.abc import Callable
 from sqlide.config.connections import Connection, ConnectionStore
 from sqlide.config.secrets import PasswordResolver
 from sqlide.config.settings import Settings, load_settings
+from sqlide.consoles import ConsoleStore
 from sqlide.db.factory import create_session
 from sqlide.db.session import DbSession
 from sqlide.drivers.registry import DriverDef, DriverRegistry
@@ -24,11 +25,13 @@ class Workspace:
         registry: DriverRegistry | None = None,
         resolver: PasswordResolver | None = None,
         settings: Settings | None = None,
+        consoles: ConsoleStore | None = None,
     ) -> None:
         self.store = store or ConnectionStore()
         self.registry = registry or DriverRegistry()
         self.resolver = resolver or PasswordResolver()
         self.settings = settings or load_settings()
+        self.consoles = consoles or ConsoleStore()
 
     # --- connections ---
     def connections(self) -> list[Connection]:

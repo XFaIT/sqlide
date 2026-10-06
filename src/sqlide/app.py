@@ -15,14 +15,15 @@ class SqlideApp(App):
     CSS_PATH = str(Path(__file__).parent / "ui" / "app.tcss")
     BINDINGS = [Binding("ctrl+q", "quit", "Quit", priority=True)]
 
-    def __init__(self, workspace: Workspace | None = None) -> None:
+    def __init__(self, workspace: Workspace | None = None, files: list[Path] | None = None) -> None:
         super().__init__()
         self.workspace = workspace or Workspace()
+        self._files = files or []
 
     def on_mount(self) -> None:
-        self.main = MainScreen(self.workspace)
+        self.main = MainScreen(self.workspace, self._files)
         self.push_screen(self.main)
 
     async def action_quit(self) -> None:
-        await self.main.console.detach()  # cancel a running query, close the connection
+        await self.main.tabs.shutdown()  # save consoles, cancel queries, close connections
         self.exit()
