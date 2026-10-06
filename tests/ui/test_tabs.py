@@ -261,3 +261,28 @@ async def test_tab_label_shows_connection_name(make_ws):
         pane = active(app).parent
         label = tabs(app).get_tab(pane.id).label.plain
         assert label == "console_1 [h2-local]"
+
+
+async def test_format_and_comment_actions(make_ws):
+    app = SqlideApp(make_ws())
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        ed = active(app).editor
+        ed.text = "select a,b from t where x=1;\n\nselect 2"
+        ed.focus()
+        ed.move_cursor((0, 3))
+        await pilot.press("f7")
+        await pilot.pause()
+        assert ed.text == "SELECT\n  a,\n  b\nFROM t\nWHERE\n  x = 1;\n\nselect 2"
+        ed.move_cursor((0, 0))
+        await pilot.press("alt+slash")
+        await pilot.pause()
+        assert ed.text.startswith("-- SELECT\n  a,")
+        await pilot.press("alt+slash")
+        await pilot.pause()
+        assert ed.text.startswith("SELECT\n  a,")
+        ed.text = "select from where"
+        ed.move_cursor((0, 2))
+        await pilot.press("f7")  # unparsable: text untouched
+        await pilot.pause()
+        assert ed.text == "select from where"

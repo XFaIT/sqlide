@@ -17,6 +17,7 @@ from textual.timer import Timer
 from textual.widgets import TextArea
 
 from sqlide.db.completion import Candidate
+from sqlide.sql.format import FormatError, format_sql, toggle_line_comments
 from sqlide.sql.splitter import Span, span_lines, split, statement_at
 from sqlide.ui.widgets.completion_popup import CompletionPopup
 
@@ -30,6 +31,8 @@ class SqlEditor(TextArea):
         Binding("f5,ctrl+j,ctrl+enter", "run_statement", "Run", priority=True),
         Binding("shift+f5,ctrl+shift+enter", "run_all", "Run all", priority=True),
         Binding("ctrl+space,ctrl+@", "complete", "Complete", show=False),
+        Binding("ctrl+alt+l,f7", "format", "Format", show=False),
+        Binding("ctrl+slash,ctrl+underscore,alt+slash", "toggle_comment", "Comment", show=False),
     ]
 
     class RunRequested(Message):
@@ -144,6 +147,44 @@ class SqlEditor(TextArea):
             self.post_message(self.RunRequested(stmts))
         else:
             self.app.notify("Nothing to run", severity="warning")
+
+    # --- editing helpers ---
+    def action_format(self) -> None:
+        """Pretty-print the selection, or the framed statement."""
+        sel = self.selection
+        if not sel.is_empty:
+            start, end = sorted((sel.start, sel.end))
+            src = self.get_text_range(start, end)
+        else:
+            self._recalc()
+            span = statement_at(self._spans, self.text, self._cursor_index())
+            if span is None:
+                self.app.notify("No statement at cursor", severity="warning")
+                return
+            doc = cast(Document, self.document)
+            start, end = (
+                doc.get_location_from_index(span.start),
+                doc.get_location_from_index(span.end),
+            )
+            src = span.text(self.text)
+        try:
+            formatted = format_sql(src, self._dialect)
+        except FormatError as e:
+            self.app.notify(str(e), title="Cannot format", severity="warning")
+            return
+        if formatted != src:
+            self.replace(formatted, start, end)
+
+    def action_toggle_comment(self) -> None:
+        sel = self.selection
+        first, last = sorted((sel.start[0], sel.end[0]))
+        if not sel.is_empty and sel.end[1] == 0 and sel.end[0] > sel.start[0]:
+            last -= 1  # a selection ending at column 0 does not include that line
+        lines = [self.document.get_line(i) for i in range(first, last + 1)]
+        new = toggle_line_comments(lines)
+        if new != lines:
+            end_col = len(lines[-1])
+            self.replace("\n".join(new), (first, 0), (last, end_col))
 
     # --- drawing ---
     def render_line(self, y: int) -> Strip:
