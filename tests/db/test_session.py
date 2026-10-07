@@ -92,3 +92,10 @@ async def test_manual_transaction(session):
 async def test_close(session):
     await session.close()
     assert not session.connected
+
+
+async def test_call_after_close_is_a_db_error_not_a_crash(session):
+    await session.close()
+    with pytest.raises(DbError, match="closed"):
+        await session.call(lambda conn: conn)
+    await session.close()  # closing twice is fine

@@ -103,6 +103,8 @@ class ConnectionEditor(ModalScreen[Connection | None]):
                 password_cmd=self._val("password_cmd"),
                 properties=self._existing.properties if self._existing else {},
                 autocommit=self.query_one("#autocommit", Switch).value,
+                schemas=list(self._existing.schemas) if self._existing else [],
+                table_filter=self._existing.table_filter if self._existing else "",
             )
         except ConfigError as e:
             self.query_one("#error", Static).update(str(e))

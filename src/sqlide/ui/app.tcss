@@ -65,3 +65,16 @@ HistoryScreen { align: center middle; }
 
 #driver-list { height: 12; }
 .dialog .hint { color: $text-muted; margin-top: 1; }
+
+ScopeScreen { align: center middle; }
+#scope-box {
+    width: 80%;
+    height: 85%;
+    padding: 1 2;
+    border: round $primary;
+    background: $surface;
+}
+#scope-title { text-style: bold; }
+#scope-list { height: 1fr; }
+#scope-box .buttons { height: auto; margin-top: 1; }
+#scope-box .buttons Button { margin-right: 1; }

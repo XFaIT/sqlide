@@ -16,6 +16,7 @@ from sqlide.config._toml import ConfigError
 from sqlide.config.connections import Connection
 from sqlide.config.settings import save_settings
 from sqlide.consoles import FILE
+from sqlide.db.metadata import visible_namespaces
 from sqlide.db.result import DbError
 from sqlide.drivers.loader import DriverError
 from sqlide.drivers.maven import MavenError
@@ -26,6 +27,7 @@ from sqlide.ui.screens.connection_editor import ConnectionEditor
 from sqlide.ui.screens.dialogs import ConfirmScreen, PasswordPrompt, PathPrompt, ProgressScreen
 from sqlide.ui.screens.driver_manager import DriverManager
 from sqlide.ui.screens.history import HistoryScreen
+from sqlide.ui.screens.scope import ScopeScreen
 from sqlide.ui.screens.settings import SettingsScreen
 from sqlide.ui.widgets.connections_list import ConnectionItem, ConnectionsList
 from sqlide.ui.widgets.console_tab import ConsoleTab
@@ -133,12 +135,39 @@ class MainScreen(Screen):
         console = self.tabs.active_console
         self.app.sub_title = console.conn_name if console else ""
         if console is not None:
-            self.schema.show(console.meta, console.conn_name)
+            self.schema.show(console.meta, console.conn_name, console.conn)
 
     def on_console_tab_schema_changed(self, msg: ConsoleTab.SchemaChanged) -> None:
+        """A DDL ran. Nothing re-reads the database by itself: the tree waits for F5."""
         msg.stop()
         if msg.console is self.tabs.active_console:
-            self.schema.show(msg.console.meta, msg.console.conn_name)
+            self.schema.mark_stale()
+
+    def on_schema_tree_scope_requested(self, msg: SchemaTree.ScopeRequested) -> None:
+        msg.stop()
+        self.run_worker(self._choose_scope(self.console), group="scope", exclusive=True)
+
+    async def _choose_scope(self, console: ConsoleTab) -> None:
+        meta, conn = console.meta, console.conn
+        if meta is None or conn is None:
+            return
+        try:
+            spaces = await meta.namespaces()
+            current = await meta.current_namespace()
+        except DbError as e:
+            self._report(e, console)
+            return
+        chosen = conn.schemas or [n.name for n in visible_namespaces(spaces, current, [])[0]]
+        result = await self.app.push_screen_wait(ScopeScreen(spaces, chosen, conn.table_filter))
+        if result is None:
+            return
+        conn.schemas, conn.table_filter = result.schemas, result.table_filter
+        try:
+            self.ws.save_connection(conn)
+        except ConfigError as e:
+            self._report(e, console)
+        if console is self.tabs.active_console and console.meta is meta:
+            self.schema.show(meta, console.conn_name, conn)
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         if event.tabbed_content is self.tabs:  # not the result tabs inside a console

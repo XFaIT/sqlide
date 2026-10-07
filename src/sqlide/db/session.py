@@ -81,6 +81,8 @@ class _Cursor:
         return await self._s.call(lambda _c: self._read(n))
 
     async def close(self) -> None:
+        if self._s._closed:  # the session already closed every cursor
+            return
         await self._s.call(lambda _c: self._close_sync())
 
 
@@ -103,6 +105,7 @@ class DbSession:
             self._props["password"] = password
         self._want_autocommit = autocommit
         self._conn: Any = None
+        self._closed = False
         self._pool = ThreadPoolExecutor(1, "sqlide-jdbc", initializer=self._init_thread)
         self._lock = threading.Lock()
         self._stmt: Any = None
@@ -119,8 +122,15 @@ class DbSession:
 
     async def call(self, fn: Callable[[Any], T]) -> T:
         """Run fn(java_connection) on the session thread. Use for metadata and misc JDBC."""
+        if self._closed:
+            raise DbError("Connection is closed")
         loop = asyncio.get_running_loop()
-        return await loop.run_in_executor(self._pool, lambda: fn(self._conn))
+        try:
+            return await loop.run_in_executor(self._pool, lambda: fn(self._conn))
+        except RuntimeError as e:  # closed between the check and the submit
+            if self._closed or "after shutdown" in str(e):
+                raise DbError("Connection is closed") from e
+            raise
 
     # --- lifecycle ---
     async def open(self) -> None:
@@ -142,7 +152,10 @@ class DbSession:
         await self.call(connect)
 
     async def close(self) -> None:
+        if self._closed:
+            return
         if self._conn is None:
+            self._closed = True
             self._pool.shutdown(wait=False)
             return
         self.cancel()
@@ -156,9 +169,12 @@ class DbSession:
             with contextlib.suppress(jpype.JException):
                 conn.close()
 
-        await self.call(shut)
-        self._conn = None
-        self._pool.shutdown(wait=False)
+        try:
+            await self.call(shut)
+        finally:
+            self._closed = True
+            self._conn = None
+            self._pool.shutdown(wait=False)
 
     @property
     def connected(self) -> bool:

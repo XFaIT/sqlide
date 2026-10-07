@@ -20,7 +20,9 @@ Works on Linux, macOS and WSL.
 - **Export.** CSV, TSV, JSON, JSON Lines, Markdown, SQL inserts, HTML, XLSX. Export the loaded
   rows or re-run the query and stream the full result to disk, with progress and cancel.
 - **Schema tree and autocomplete.** Lazy metadata, `SELECT *` on Enter, alias-aware column
-  completion, keywords and functions per dialect.
+  completion, keywords and functions per dialect. `S` in the tree picks which schemas or
+  databases and which tables (names or globs like `fact_*`) are shown; the choice is saved per
+  connection. A database with hundreds of schemas starts with only the working one.
 - **Consoles and files.** Tabs with their own connection; consoles autosave and come back
   after a restart; open and save `.sql` files (`sqlide a.sql b.sql`).
 - **History, formatting, transactions.** Searchable query history, SQL formatting,
@@ -96,9 +98,10 @@ Override with `SQLIDE_CONFIG_DIR` and `SQLIDE_DATA_DIR`.
 - Schema reads (tree, autocomplete) use a second connection, so they work while a query runs.
   For in-memory databases (H2 `mem:`, SQLite `:memory:`, DuckDB) a second connection would see
   a different database, so the query connection is shared and reads wait for a running query.
-- Autocomplete reads cached metadata. DDL you run in the editor refreshes it; changes made by
-  other clients need `F5` in the schema tree. In manual-commit mode new objects appear after
-  Commit.
+- Nothing polls the database. Structure is read on demand (expanding a node, autocomplete) and
+  cached. After DDL in the editor the cache is dropped and the tree shows "F5 to refresh"; press
+  `F5` in the tree to re-read it, also for changes made by other clients. In manual-commit mode
+  new objects appear after Commit.
 - MySQL `DELIMITER x` lines are understood (they are not sent to the server). On SQL Server,
   `CREATE PROCEDURE/FUNCTION/TRIGGER` without `BEGIN..END` runs up to the next `GO`, as T-SQL does.
 - `Alt+1`..`Alt+4` only work in terminals with the kitty keyboard protocol; most terminals

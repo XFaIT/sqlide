@@ -6,6 +6,7 @@ Pure data + one class that needs a session; nothing here knows about the UI.
 from __future__ import annotations
 
 import contextlib
+import fnmatch
 from dataclasses import dataclass
 from typing import Any
 
@@ -27,6 +28,9 @@ _SYSTEM = {
 def is_system_namespace(name: str) -> bool:
     low = name.lower()
     return low in _SYSTEM or low.startswith(("pg_temp", "pg_toast"))
+
+
+AUTO_ALL_LIMIT = 20  # up to this many user schemas the tree shows all of them by default
 
 
 @dataclass(frozen=True)
@@ -59,6 +63,38 @@ class Column:
     type_name: str
     nullable: bool
     primary_key: bool = False
+
+
+def visible_namespaces(
+    spaces: list[Namespace], current: str, selected: list[str], limit: int = AUTO_ALL_LIMIT
+) -> tuple[list[Namespace], int]:
+    """The namespaces the tree shows and how many it leaves out.
+
+    `selected` is the user's choice (case-insensitive). Without one, a small database shows
+    everything and a big one (hundreds of schemas) only the working schema.
+    """
+    if selected:
+        chosen = {n.lower() for n in selected}
+        shown = [n for n in spaces if n.name.lower() in chosen]
+    else:
+        user = [n for n in spaces if not is_system_namespace(n.name)]
+        if len(user) <= limit:
+            shown = list(spaces)
+        else:
+            shown = [n for n in spaces if current and n.name.lower() == current.lower()]
+            shown = shown or user[:limit]
+    return shown, len(spaces) - len(shown)
+
+
+def table_matches(name: str, patterns: str) -> bool:
+    """Comma-separated name filter: globs (`fact_*`) or plain substrings, case-insensitive."""
+    pats = [p.strip().lower() for p in patterns.split(",") if p.strip()]
+    if not pats:
+        return True
+    low = name.lower()
+    return any(
+        fnmatch.fnmatchcase(low, p if any(c in p for c in "*?[") else f"*{p}*") for p in pats
+    )
 
 
 def _scope(name: str, is_catalog: bool) -> tuple[str | None, str | None]:
