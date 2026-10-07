@@ -96,3 +96,23 @@ async def test_ddl_run_from_the_editor_refreshes_metadata_and_tree(make_ws):
             )
         ]
         assert "FRESH_ONE" in tables
+
+
+async def test_typing_a_word_opens_the_popup_by_itself(make_ws):
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("ac9"))))
+    async with app.run_test(size=(140, 40)) as pilot:
+        _, ed = await setup(pilot, app, "ac9")
+        await type_text(pilot, "select * from pe")  # no Ctrl+Space
+        await wait_for(pilot, lambda: ed.completing)
+        assert popup(ed).current.text == "PEOPLE"
+
+
+async def test_a_finished_word_does_not_hijack_enter(make_ws):
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("ac10"))))
+    async with app.run_test(size=(140, 40)) as pilot:
+        _, ed = await setup(pilot, app, "ac10")
+        await type_text(pilot, "select * from PEOPLE")
+        await pilot.pause(0.5)
+        await pilot.press("enter")
+        await pilot.pause()
+        assert ed.text == "select * from PEOPLE\n"

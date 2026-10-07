@@ -252,6 +252,8 @@ class ConsoleTab(ExportActions, Vertical):
             self._warned = self.meta.error  # say it once: otherwise "no tables" is a mystery
             self.status.update_state(message=f"autocomplete: {self.meta.error}")
             self.app.notify(self.meta.error, title="Autocomplete: no metadata", severity="warning")
+        if len(items) == 1 and items[0].text.lower() == ctx.prefix.lower():
+            items = []  # the word is already complete: nothing to offer, Enter stays a newline
         if self.editor._cursor_index() != req.offset:  # the user typed on; a newer request follows
             return
         self.editor.show_completions(items, ctx.replace_len)

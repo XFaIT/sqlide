@@ -136,8 +136,8 @@ async def _from_metadata(
         current = await meta.current_namespace()
         shown, _ = visible_namespaces(spaces, current, selected)
         home = await _find_namespace(meta, current)
-        if home is not None and home not in shown:
-            shown = [home, *shown]  # unqualified names resolve there whatever was chosen
+        if home is not None:  # unqualified names resolve there: offer it first, chosen or not
+            shown = [home, *(n for n in shown if n != home)]
         current_cat = await meta.current_catalog() if await meta.catalogs() else ""
         elsewhere = await _chosen_elsewhere(meta, selected, current_cat)
         for ns in [*shown, *elsewhere][:MAX_SCHEMAS]:

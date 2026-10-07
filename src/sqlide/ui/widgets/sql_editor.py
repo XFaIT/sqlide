@@ -260,11 +260,13 @@ class SqlEditor(TextArea):
         self._request_completion(manual=True)
 
     def _maybe_complete(self) -> None:
-        """Auto-open after a dot; keep an open popup in sync while typing."""
+        """Auto-open after a dot or once two word characters are typed; keep it in sync."""
         if self._accepting:
             return
-        before = self.text[self._cursor_index() - 1 : self._cursor_index()]
-        if before == "." or self.completing:
+        end = self._cursor_index()
+        before = self.text[max(end - 2, 0) : end]
+        typing_word = len(before) == 2 and all(c.isalnum() or c == "_" for c in before)
+        if before[-1:] == "." or typing_word or self.completing:
             self._request_completion(manual=False)
 
     def _request_completion(self, manual: bool) -> None:
