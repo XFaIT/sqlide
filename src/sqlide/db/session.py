@@ -115,6 +115,10 @@ class DbSession:
         self.pending_tx = False  # manual mode: statements since last commit/rollback
         self.product = ""
 
+    @property
+    def url(self) -> str:
+        return self._url
+
     # --- plumbing ---
     def _init_thread(self) -> None:
         # drivers using ServiceLoader (ClickHouse) look classes up via the context loader

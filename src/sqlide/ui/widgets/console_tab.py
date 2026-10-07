@@ -76,6 +76,7 @@ class ConsoleTab(ExportActions, Vertical):
         self.meta: MetaCache | None = None
         self.meta_session: DbSession | None = None
         self._executing = False
+        self._warned = ""
         self._autosave: Timer | None = None
         try:
             self._initial, self._newline = ws.consoles.read(path)
@@ -243,7 +244,14 @@ class ConsoleTab(ExportActions, Vertical):
         if ctx is None or (not ctx.prefix and not ctx.qualifier and not req.manual):
             self.editor.hide_completions()
             return
-        items = await candidates(ctx, self.meta, dialect)
+        selected = self.conn.schemas if self.conn else None
+        items = await candidates(
+            ctx, self.meta, dialect, selected, self.conn.catalogs if self.conn else None
+        )
+        if self.meta is not None and self.meta.error and self.meta.error != self._warned:
+            self._warned = self.meta.error  # say it once: otherwise "no tables" is a mystery
+            self.status.update_state(message=f"autocomplete: {self.meta.error}")
+            self.app.notify(self.meta.error, title="Autocomplete: no metadata", severity="warning")
         if self.editor._cursor_index() != req.offset:  # the user typed on; a newer request follows
             return
         self.editor.show_completions(items, ctx.replace_len)

@@ -26,6 +26,7 @@ from sqlide.sql.snippets import qualified_name, select_all
 from sqlide.ui.screens.connection_editor import ConnectionEditor
 from sqlide.ui.screens.dialogs import ConfirmScreen, PasswordPrompt, PathPrompt, ProgressScreen
 from sqlide.ui.screens.driver_manager import DriverManager
+from sqlide.ui.screens.help import HelpScreen
 from sqlide.ui.screens.history import HistoryScreen
 from sqlide.ui.screens.scope import ScopeScreen
 from sqlide.ui.screens.settings import SettingsScreen
@@ -47,6 +48,7 @@ class MainScreen(Screen):
             "ctrl+f4,alt+w", "close_console", "Close tab", priority=True, id="main.close_console"
         ),
         Binding("ctrl+alt+e,alt+e", "history", "History", priority=True, id="main.history"),
+        Binding("f1", "help", "Help", id="main.help"),
         Binding("ctrl+o", "open_file", "Open file", id="main.open_file"),
         Binding("ctrl+s", "save_file", "Save", id="main.save_file"),
         Binding("alt+right", "tab(1)", "Next tab", show=False, id="main.next_tab"),
@@ -164,7 +166,25 @@ class MainScreen(Screen):
             if conn.schemas is not None
             else [n.name for n in visible_namespaces(spaces, current, None)[0]]
         )
-        result = await self.app.push_screen_wait(ScopeScreen(spaces, chosen, conn.table_filter))
+        try:
+            cats = await meta.catalogs()
+            start = await meta.current_catalog() if cats else ""
+        except DbError as e:
+            self._report(e, console)
+            return
+        if cats:
+            screen = ScopeScreen(
+                [],
+                chosen,
+                conn.table_filter,
+                catalogs=cats,
+                chosen_catalogs=conn.catalogs if conn.catalogs is not None else [start],
+                loader=meta.schemas_of,
+                start_catalog=start,
+            )
+        else:
+            screen = ScopeScreen(spaces, chosen, conn.table_filter)
+        result = await self.app.push_screen_wait(screen)
         if result is None:
             if not auto:
                 return
@@ -173,6 +193,8 @@ class MainScreen(Screen):
             )
         else:
             conn.schemas, conn.table_filter = result.schemas, result.table_filter
+            if result.catalogs is not None:
+                conn.catalogs = result.catalogs
         try:
             self.ws.save_connection(conn)
         except ConfigError as e:
@@ -202,6 +224,9 @@ class MainScreen(Screen):
         current = next((i for i, w in enumerate(order) if w is self.focused), -1)
         order[(current + step) % len(order)].focus()
 
+    def action_help(self) -> None:
+        self.app.push_screen(HelpScreen())
+
     def action_focus_sidebar(self) -> None:
         self.sidebar.focus()
 
@@ -212,7 +237,7 @@ class MainScreen(Screen):
         msg.stop()
         console = self.console
         dialect = console.editor.dialect
-        name = qualified_name([msg.table.namespace, msg.table.name], dialect)
+        name = qualified_name(list(msg.table.parts), dialect)
         editor = console.editor
         if msg.action == "insert":
             editor.insert(name)

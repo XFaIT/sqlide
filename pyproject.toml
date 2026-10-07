@@ -1,6 +1,6 @@
 [project]
 name = "sqlide"
-version = "0.1.3"
+version = "0.2.0"
 description = "Terminal SQL IDE (DataGrip-like) over JDBC"
 readme = "README.md"
 license = { text = "MIT" }

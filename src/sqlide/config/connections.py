@@ -24,6 +24,7 @@ class Connection:
     properties: dict[str, str] = field(default_factory=dict)
     autocommit: bool = True
     schemas: list[str] | None = None  # schemas/databases the tree shows; None = never chosen
+    catalogs: list[str] | None = None  # databases/catalogs shown (when a connection has several)
     table_filter: str = ""  # comma-separated globs or substrings; "" = all tables
 
     def __post_init__(self) -> None:
@@ -79,4 +80,6 @@ def _to_dict(c: Connection) -> dict[str, Any]:
     }
     if c.schemas is not None:  # TOML has no null: absent means "never chosen"
         out["schemas"] = c.schemas
+    if c.catalogs is not None:
+        out["catalogs"] = c.catalogs
     return out

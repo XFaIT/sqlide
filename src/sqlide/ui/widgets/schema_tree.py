@@ -21,7 +21,16 @@ from sqlide.db.metadata import (
 )
 from sqlide.db.result import DbError
 
-ICON_NS, ICON_TABLE, ICON_VIEW = "▣", "▤", "◫"
+ICON_NS, ICON_TABLE, ICON_VIEW, ICON_DB = "▣", "▤", "◫", "◆"
+
+
+class CatalogRef:
+    """Tree data of a catalog (database) node when names have three levels."""
+
+    __slots__ = ("name",)
+
+    def __init__(self, name: str) -> None:
+        self.name = name
 
 
 class SchemaTree(Tree[object]):
@@ -95,9 +104,70 @@ class SchemaTree(Tree[object]):
         node.remove_children()
         node.add_leaf(Text(f"✖ {str(e).splitlines()[0] if str(e) else e!r}", style="red"))
 
+    async def _load_catalogs(self, meta: MetaCache, node: TreeNode, cats: list[str]) -> None:
+        try:
+            current = await meta.current_catalog()
+        except DbError:
+            current = ""
+        if meta is not self._meta:
+            return
+        chosen = self._conn.catalogs if self._conn else None
+        if chosen is None:
+            chosen = [current] if current else []
+        wanted = {c.lower() for c in chosen}
+        shown = [c for c in cats if c.lower() in wanted]
+        node.remove_children()
+        opened = None
+        for cat in shown:
+            child = node.add(Text(f"{ICON_DB} {cat}"), data=CatalogRef(cat))
+            if opened is None and cat.lower() == current.lower():
+                opened = child
+        if len(shown) < len(cats):
+            hint = f"… {len(cats) - len(shown)} more databases hidden: press S to choose"
+            node.add_leaf(Text(hint, style="dim italic"))
+        if opened is not None:
+            opened.expand()
+        conn = self._conn
+        if conn is not None and conn.catalogs is None and conn.schemas is None:
+            self.post_message(self.ScopeRequested(auto=True))
+
+    async def _load_schemas(self, meta: MetaCache, node: TreeNode, ref: CatalogRef) -> None:
+        self._placeholder(node)
+        try:
+            spaces = await meta.schemas_of(ref.name)
+            at_home = ref.name.lower() == (await meta.current_catalog()).lower()
+            current = (await meta.current_namespace()).lower() if at_home else ""
+        except DbError as e:
+            self._fail(node, e)
+            return
+        if meta is not self._meta:
+            return
+        selected = self._conn.schemas if self._conn else None
+        spaces, hidden = visible_namespaces(spaces, current, selected)
+        spaces = sorted(
+            spaces, key=lambda n: (is_system_namespace(n.name), n.name.lower() != current)
+        )
+        node.remove_children()
+        opened = None
+        for ns in spaces:
+            style = "dim" if is_system_namespace(ns.name) else ""
+            child = node.add(Text(f"{ICON_NS} {ns.name}", style=style), data=ns)
+            if opened is None and ns.name.lower() == current:
+                opened = child
+        if hidden:
+            node.add_leaf(Text(f"… {hidden} more hidden: press S to choose", style="dim italic"))
+        if not spaces and not hidden:
+            node.add_leaf(Text("(no schemas)", style="dim italic"))
+        if opened is not None:
+            opened.expand()
+
     async def _load_namespaces(self, meta: MetaCache, node: TreeNode) -> None:
         self._placeholder(node)
         try:
+            cats = await meta.catalogs()
+            if cats:
+                await self._load_catalogs(meta, node, cats)
+                return
             spaces = await meta.namespaces()
         except DbError as e:
             self._fail(node, e)
@@ -169,7 +239,9 @@ class SchemaTree(Tree[object]):
         node, meta = event.node, self._meta
         if meta is None or node.children:
             return  # already loaded
-        if isinstance(node.data, Namespace):
+        if isinstance(node.data, CatalogRef):
+            self.run_worker(self._load_schemas(meta, node, node.data), group=f"cat-{node.id}")
+        elif isinstance(node.data, Namespace):
             self.run_worker(self._load_tables(meta, node, node.data), group=f"ns-{node.id}")
         elif isinstance(node.data, Table):
             self.run_worker(self._load_columns(meta, node, node.data), group=f"t-{node.id}")

@@ -13,10 +13,10 @@ async def meta(session):
     return MetaCache(session)
 
 
-async def complete(meta, sql: str):
+async def complete(meta, sql: str, selected=None):
     offset = sql.index("|")
     ctx = analyze(sql.replace("|", ""), offset, "generic")
-    return await candidates(ctx, meta, "generic")
+    return await candidates(ctx, meta, "generic", selected)
 
 
 def texts(cs, kind=None):
@@ -66,3 +66,27 @@ async def test_unknown_table_degrades_gracefully(meta):
 async def test_works_without_metadata():
     ctx = analyze("sel", 3, "generic")
     assert "select" in texts(await candidates(ctx, None, "generic"))
+
+
+async def test_tables_of_chosen_schemas_are_offered_with_a_qualifier(meta):
+    cs = await complete(meta, "select * from us|", selected=["PUBLIC", "APP"])
+    hit = [c for c in cs if c.kind == "table"]
+    assert [c.text for c in hit] == ["APP.USERS"] and hit[0].detail == "APP"
+    plain = await complete(meta, "select * from |", selected=["PUBLIC", "APP"])
+    assert "ORDERS" in texts(plain, "table") and "APP.USERS" in texts(plain, "table")
+
+
+async def test_unchosen_schemas_are_not_offered_but_the_working_schema_always_is(meta):
+    cs = await complete(meta, "select * from |", selected=["APP"])
+    assert "ORDERS" in texts(cs, "table")  # PUBLIC is the working schema
+    assert "APP.USERS" in texts(cs, "table")
+    only_public = await complete(meta, "select * from |", selected=["PUBLIC"])
+    assert "APP.USERS" not in texts(only_public, "table")
+
+
+async def test_metadata_failure_is_remembered_for_the_ui(session):
+    meta = MetaCache(session)
+    await session.close()
+    cs = await complete(meta, "select * from |")
+    assert texts(cs, "keyword")  # still useful
+    assert meta.error and "closed" in meta.error

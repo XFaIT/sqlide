@@ -75,6 +75,18 @@ ScopeScreen { align: center middle; }
     background: $surface;
 }
 #scope-title { text-style: bold; }
-#scope-list { height: 1fr; }
+#scope-panes { height: 1fr; }
+#scope-list { height: 1fr; width: 1fr; }
+#scope-cats { height: 1fr; width: 30; margin-right: 1; }
 #scope-box .buttons { height: auto; margin-top: 1; }
 #scope-box .buttons Button { margin-right: 1; }
+
+#help-box {
+    width: 80%;
+    height: 85%;
+    padding: 1 2;
+    border: round $primary;
+    background: $surface;
+}
+#help-title { text-style: bold; }
+#help-log { height: 1fr; }

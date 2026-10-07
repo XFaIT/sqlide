@@ -14,6 +14,10 @@ import jpype
 
 from sqlide.db.session import DbSession, _db_error
 
+# Databases whose catalogs can all be read and queried through one connection, so the tree
+# has three levels. (PostgreSQL's driver lists databases but reads only the connected one.)
+THREE_LEVEL_URLS = ("jdbc:sqlserver:", "jdbc:databricks:", "jdbc:spark:", "jdbc:snowflake:")
+
 TABLE_TYPES = ["TABLE", "VIEW", "MATERIALIZED VIEW", "SYSTEM TABLE", "FOREIGN TABLE"]
 
 
@@ -32,10 +36,20 @@ def is_system_namespace(name: str) -> bool:
 
 @dataclass(frozen=True)
 class Namespace:
-    """A schema, or a catalog on databases that have no schemas (MySQL, ClickHouse)."""
+    """A schema, or a catalog on databases that have no schemas (MySQL, ClickHouse).
+
+    `catalog` is set for a schema inside a catalog when the connection has several catalogs
+    (SQL Server, Databricks): names then have three parts.
+    """
 
     name: str
     is_catalog: bool = False
+    catalog: str = ""
+
+    @property
+    def key(self) -> str:
+        """Stable id used in the saved choice: `schema`, or `catalog/schema` in three levels."""
+        return f"{self.catalog}/{self.name}" if self.catalog else self.name
 
 
 @dataclass(frozen=True)
@@ -44,14 +58,19 @@ class Table:
     name: str
     kind: str  # driver-specific: TABLE, BASE TABLE, VIEW, ...
     is_catalog: bool = False
+    catalog: str = ""
 
     @property
     def is_view(self) -> bool:
         return "VIEW" in self.kind.upper()
 
     @property
+    def parts(self) -> list[str]:
+        return [p for p in (self.catalog, self.namespace, self.name) if p]
+
+    @property
     def qualified(self) -> str:
-        return f"{self.namespace}.{self.name}" if self.namespace else self.name
+        return ".".join(self.parts)
 
 
 @dataclass(frozen=True)
@@ -73,7 +92,7 @@ def visible_namespaces(
     """
     if selected is not None:
         chosen = {n.lower() for n in selected}
-        shown = [n for n in spaces if n.name.lower() in chosen]
+        shown = [n for n in spaces if n.key.lower() in chosen]
     elif sum(1 for n in spaces if not is_system_namespace(n.name)) <= 1:
         shown = list(spaces)
     else:
@@ -97,11 +116,13 @@ def table_matches(name: str, patterns: str) -> bool:
     )
 
 
-def _scope(name: str, is_catalog: bool) -> tuple[str | None, str | None]:
+def _scope(name: str, is_catalog: bool, catalog: str = "") -> tuple[str | None, str | None]:
     """(catalog, schema) arguments for DatabaseMetaData; "" means no filter at all."""
     if not name:
         return None, None
-    return (name, None) if is_catalog else (None, name)
+    if is_catalog:
+        return name, None
+    return (catalog or None), name
 
 
 def _rows(rs: Any, *cols: str) -> list[tuple[Any, ...]]:
@@ -122,8 +143,12 @@ class MetaCache:
         self._s = session
         self._namespaces: list[Namespace] | None = None
         self._current: str | None = None
+        self._catalogs: list[str] | None = None
+        self._current_catalog: str | None = None
+        self._catalog_schemas: dict[str, list[Namespace]] = {}
         self._tables: dict[str, list[Table]] = {}
-        self._columns: dict[tuple[str, str], list[Column]] = {}
+        self._columns: dict[tuple[str, str, str], list[Column]] = {}
+        self.error: str | None = None  # last metadata failure seen by autocomplete
 
     def use(self, session: DbSession) -> None:
         """Read from another session (a dedicated one) from now on; the cache stays."""
@@ -132,14 +157,67 @@ class MetaCache:
     def refresh(self) -> None:
         self._namespaces = None
         self._current = None
+        self._catalogs = None
+        self._current_catalog = None
+        self._catalog_schemas.clear()
         self._tables.clear()
         self._columns.clear()
+        self.error = None
 
     # --- loading ---
     async def namespaces(self) -> list[Namespace]:
+        """Schemas (or catalogs) of the working catalog; see `catalogs()` for the others."""
         if self._namespaces is None:
-            self._namespaces = await self._s.call(self._load_namespaces)
+            if await self.catalogs():
+                self._namespaces = await self.schemas_of(await self.current_catalog())
+            else:
+                self._namespaces = await self._s.call(self._load_namespaces)
         return self._namespaces
+
+    async def catalogs(self) -> list[str]:
+        """Catalog names when schemas live in several catalogs (three-level names), else []."""
+        if self._catalogs is None:
+            self._catalogs = await self._s.call(lambda c: self._load_catalogs(c, self._s.url))
+        return self._catalogs
+
+    @staticmethod
+    def _load_catalogs(conn: Any, url: str) -> list[str]:
+        if not url.lower().startswith(THREE_LEVEL_URLS):
+            return []
+        try:
+            cats = [r[0] for r in _rows(conn.getMetaData().getCatalogs(), "TABLE_CAT")]
+        except jpype.JException as e:
+            raise _db_error(e) from e
+        return sorted(cats, key=str.lower) if len(cats) > 1 else []
+
+    async def current_catalog(self) -> str:
+        if self._current_catalog is None:
+            self._current_catalog = await self._s.call(self._load_current_catalog)
+        return self._current_catalog
+
+    @staticmethod
+    def _load_current_catalog(conn: Any) -> str:
+        try:
+            value = conn.getCatalog()
+        except jpype.JException:
+            return ""
+        return "" if value is None else str(value)
+
+    async def schemas_of(self, catalog: str) -> list[Namespace]:
+        if catalog not in self._catalog_schemas:
+            self._catalog_schemas[catalog] = await self._s.call(
+                lambda c: self._load_schemas_of(c, catalog)
+            )
+        return self._catalog_schemas[catalog]
+
+    @staticmethod
+    def _load_schemas_of(conn: Any, catalog: str) -> list[Namespace]:
+        try:
+            rs = conn.getMetaData().getSchemas(catalog, "%")
+            names = [r[0] for r in _rows(rs, "TABLE_SCHEM") if r[0]]
+        except jpype.JException as e:
+            raise _db_error(e) from e
+        return [Namespace(n, False, catalog) for n in sorted(names, key=str.lower)]
 
     @staticmethod
     def _load_namespaces(conn: Any) -> list[Namespace]:
@@ -173,25 +251,25 @@ class MetaCache:
         return ""
 
     async def tables(self, ns: Namespace) -> list[Table]:
-        if ns.name not in self._tables:
-            self._tables[ns.name] = await self._s.call(lambda c: self._load_tables(c, ns))
-        return self._tables[ns.name]
+        if ns.key not in self._tables:
+            self._tables[ns.key] = await self._s.call(lambda c: self._load_tables(c, ns))
+        return self._tables[ns.key]
 
     @staticmethod
     def _load_tables(conn: Any, ns: Namespace) -> list[Table]:
         try:
             md = conn.getMetaData()
-            cat, sch = (ns.name, None) if ns.is_catalog else (None, ns.name)
+            cat, sch = _scope(ns.name, ns.is_catalog, ns.catalog)
             types: Any = jpype.JArray(jpype.JString)
             rs = md.getTables(cat, sch, "%", types(TABLE_TYPES))
             rows = _rows(rs, "TABLE_NAME", "TABLE_TYPE")
         except jpype.JException as e:
             raise _db_error(e) from e
         rows.sort(key=lambda r: (r[0] or "").lower())
-        return [Table(ns.name, n or "", t or "TABLE", ns.is_catalog) for n, t in rows]
+        return [Table(ns.name, n or "", t or "TABLE", ns.is_catalog, ns.catalog) for n, t in rows]
 
     async def columns(self, table: Table) -> list[Column]:
-        key = (table.namespace, table.name)
+        key = (table.catalog, table.namespace, table.name)
         if key not in self._columns:
             self._columns[key] = await self._s.call(lambda c: self._load_columns(c, table))
         return self._columns[key]
@@ -200,7 +278,7 @@ class MetaCache:
     def _load_columns(conn: Any, t: Table) -> list[Column]:
         try:
             md = conn.getMetaData()
-            cat, sch = _scope(t.namespace, t.is_catalog)
+            cat, sch = _scope(t.namespace, t.is_catalog, t.catalog)
             pks = {r[0] for r in _rows(md.getPrimaryKeys(cat, sch, t.name), "COLUMN_NAME")}
             rows = _rows(
                 md.getColumns(cat, sch, t.name, "%"), "COLUMN_NAME", "TYPE_NAME", "IS_NULLABLE"

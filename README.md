@@ -23,7 +23,10 @@ Works on Linux, macOS and WSL.
   completion, keywords and functions per dialect. Like DataGrip, you choose what to show: on the
   first connect to a database with several schemas a picker opens (schemas or databases, plus a
   table name filter such as `fact_*`); until you choose, only the working schema is loaded.
-  `S` in the tree reopens the picker; the choice is saved per connection.
+  `S` in the tree reopens the picker; the choice is saved per connection. On SQL Server,
+  Databricks and Snowflake the picker has two panes (databases left, their schemas right), so
+  databases you did not connect to by default can be added; autocomplete knows
+  `database.schema.table` names.
 - **Consoles and files.** Tabs with their own connection; consoles autosave and come back
   after a restart; open and save `.sql` files (`sqlide a.sql b.sql`).
 - **History, formatting, transactions.** Searchable query history, SQL formatting,
@@ -78,6 +81,7 @@ in memory until you quit. A connection can instead read it from an environment v
 | Focus connections / schema / editor / results | `Alt+C` / `Alt+D` / `Alt+Q` / `Alt+R` (or `F6` / `Shift+F6` to cycle) |
 | Tx: toggle / commit / rollback | `F8` / `F9` / `F10` |
 | Grid: sort / copy / copy as / filter / export | `s` / `Ctrl+C` / `y` / `/` / `e` |
+| Help: all keys | `F1` |
 | Command palette | `Ctrl+P` |
 | Quit | `Ctrl+Q` |
 

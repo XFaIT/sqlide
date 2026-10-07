@@ -104,6 +104,7 @@ class ConnectionEditor(ModalScreen[Connection | None]):
                 properties=self._existing.properties if self._existing else {},
                 autocommit=self.query_one("#autocommit", Switch).value,
                 schemas=None if not self._existing else self._existing.schemas,
+                catalogs=None if not self._existing else self._existing.catalogs,
                 table_filter=self._existing.table_filter if self._existing else "",
             )
         except ConfigError as e:

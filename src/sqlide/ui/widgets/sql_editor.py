@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import cast
 
+from rich.color import Color as RichColor
 from rich.segment import Segment
 from rich.style import Style
 from textual.binding import Binding
@@ -24,6 +25,18 @@ from sqlide.ui.widgets.completion_popup import CompletionPopup
 IMMEDIATE_RECALC_LIMIT = 20_000  # chars; above this, recompute spans with a short debounce
 DEBOUNCE_S = 0.08
 COMPLETE_DEBOUNCE_S = 0.05
+
+
+def _has_bg(seg: Segment, keep: list[RichColor]) -> bool:
+    bg = seg.style.bgcolor if seg.style is not None else None
+    if bg is None:
+        return False
+    rgb = bg.get_truecolor()
+    return any(rgb == k.get_truecolor() for k in keep)
+
+
+def _tinted(seg: Segment, tint: Style) -> Style:
+    return (seg.style or Style()) + tint
 
 
 class SqlEditor(TextArea):
@@ -220,8 +233,17 @@ class SqlEditor(TextArea):
         segs = list(strip)
         head = segs[0]
         segs[0] = Segment(mark + head.text[1:], (head.style or Style()) + Style(color=accent))
-        segs = [Segment(s.text, (s.style or Style()) + tint, s.control) for s in segs]
+        keep = self._untinted_backgrounds()
+        segs = [
+            s if _has_bg(s, keep) else Segment(s.text, _tinted(s, tint), s.control) for s in segs
+        ]
         return Strip(segs, strip.cell_length)
+
+    def _untinted_backgrounds(self) -> list[RichColor]:
+        """Backgrounds that must survive the frame tint: the cursor and the selection."""
+        theme = self._theme
+        styles = [theme.cursor_style, theme.selection_style] if theme is not None else []
+        return [st.bgcolor for st in styles if st is not None and st.bgcolor is not None]
 
     def _frame_colors(self) -> tuple[str, Style]:
         theme = self.app.current_theme

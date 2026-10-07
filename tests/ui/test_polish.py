@@ -92,3 +92,33 @@ async def test_driver_editor_reports_errors(make_ws):
         await pilot.pause()
         assert isinstance(app.screen, DriverEditor)
         assert "Id" in str(app.screen.query_one("#driver-error").render())
+
+
+async def test_cursor_and_selection_stay_visible_inside_the_frame(make_ws):
+    from textual.widgets.text_area import Selection
+
+    from tests.ui.helpers import console
+
+    app = SqlideApp(make_ws())
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        ed = console(app).editor
+        ed.text = "select 1"
+        ed.focus()
+        ed.move_cursor((0, 3))
+        await wait_for(pilot, lambda: ed._frame is not None)
+        await pilot.pause()
+        theme = ed._theme
+        assert theme is not None
+
+        def backgrounds():
+            return {
+                s.style.bgcolor.get_truecolor()
+                for s in ed.render_line(0)
+                if s.style is not None and s.style.bgcolor is not None
+            }
+
+        assert theme.cursor_style.bgcolor.get_truecolor() in backgrounds()
+        ed.selection = Selection((0, 0), (0, 6))
+        await pilot.pause()
+        assert theme.selection_style.bgcolor.get_truecolor() in backgrounds()

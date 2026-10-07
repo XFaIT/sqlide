@@ -164,3 +164,28 @@ exec sqlide_p
     results = await run_script(db, script)
     rows = [i.rows[0][0] for i in results[-1].items if i.has_rows]
     assert rows == [11, 22]
+
+
+async def test_mssql_lists_databases_and_their_schemas(db):
+    if db.kind != "mssql":
+        pytest.skip("SQL Server only")
+    await db.execute("if db_id('sqlide_other') is null create database sqlide_other")
+    meta = MetaCache(db)
+    cats = await meta.catalogs()
+    assert "sqlide_other" in cats and "master" in cats
+    assert any(n.name == "dbo" for n in await meta.schemas_of("sqlide_other"))
+    await db.execute("use sqlide_other")
+    await db.execute("if object_id('dbo.t_other') is null create table dbo.t_other (id int)")
+    await db.execute("use master")
+    meta.refresh()
+    ns = next(n for n in await meta.schemas_of("sqlide_other") if n.name == "dbo")
+    tables = await meta.tables(ns)
+    assert any(
+        t.name == "t_other" and t.parts == ["sqlide_other", "dbo", "t_other"] for t in tables
+    )
+    ctx = analyze(
+        "select * from sqlide_other.dbo.", len("select * from sqlide_other.dbo."), "mssql"
+    )
+    assert ctx is not None
+    names = [c.text for c in await candidates(ctx, meta, "mssql")]
+    assert "t_other" in names
