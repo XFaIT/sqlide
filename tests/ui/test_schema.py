@@ -22,7 +22,7 @@ async def prepare(pilot, app):
 
 
 async def test_tree_loads_lazily(make_ws):
-    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("tree1"))))
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("tree1"), schemas=["PUBLIC", "APP"])))
     async with app.run_test(size=(140, 40)) as pilot:
         console, tree = await prepare(pilot, app)
         await wait_for(pilot, lambda: any("APP" in t for t in labels(tree.root)))
@@ -37,7 +37,7 @@ async def test_tree_loads_lazily(make_ws):
 
 
 async def test_enter_on_table_runs_select(make_ws):
-    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("tree2"))))
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("tree2"), schemas=["PUBLIC", "APP"])))
     async with app.run_test(size=(140, 40)) as pilot:
         console, tree = await prepare(pilot, app)
         await wait_for(pilot, lambda: any("APP" in t for t in labels(tree.root)))
@@ -53,7 +53,7 @@ async def test_enter_on_table_runs_select(make_ws):
 
 
 async def test_i_inserts_name_at_cursor(make_ws):
-    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("tree3"))))
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("tree3"), schemas=["PUBLIC", "APP"])))
     async with app.run_test(size=(140, 40)) as pilot:
         console, tree = await prepare(pilot, app)
         await wait_for(pilot, lambda: any("APP" in t for t in labels(tree.root)))

@@ -14,31 +14,33 @@ def labels(node):
     return [str(c.label) for c in node.children]
 
 
-async def make_schemas(pilot, app, n=25):
-    await connect_first(pilot, app)
+def schema_rows(tree):
+    return [t for t in labels(tree.root) if "▣" in t]
+
+
+async def add_schemas(app, n=25):
     c = console(app)
     for i in range(n):
         await c.session.execute(f"create schema sc_{i:02d}")
         await c.session.execute(f"create table sc_{i:02d}.fact_a (id int)")
         await c.session.execute(f"create table sc_{i:02d}.dim_b (id int)")
     c.meta.refresh()
-    app.screen.schema.action_refresh()
-    return c, app.screen.schema
+    return c
 
 
-async def test_big_database_loads_only_the_working_schema_and_lets_you_choose(make_ws):
+async def test_first_connect_to_a_many_schema_database_asks_and_shows_only_the_working_one(make_ws):
     ws = make_ws(Connection("h", "h2", URL.format("scope1")))
     app = SqlideApp(ws)
     async with app.run_test(size=(140, 40)) as pilot:
-        c, tree = await make_schemas(pilot, app)
-        await wait_for(pilot, lambda: any("hidden" in t for t in labels(tree.root)))
-        shown = [t for t in labels(tree.root) if "▣" in t]
-        assert len(shown) == 1 and "PUBLIC" in shown[0]
-
-        tree.focus()
-        await pilot.press("s")
-        await wait_for(pilot, lambda: isinstance(app.screen, ScopeScreen))
+        await connect_first(pilot, app)
+        await add_schemas(app)
+        tree = app.screen.schema
+        tree.action_refresh()
+        await wait_for(pilot, lambda: isinstance(app.screen, ScopeScreen))  # asks by itself
         dlg = app.screen
+        assert [t for t in schema_rows(tree)] and "PUBLIC" in schema_rows(tree)[0]
+        assert len(schema_rows(tree)) == 1  # nothing else was loaded
+
         lst = dlg.query_one("#scope-list", SelectionList)
         lst.select("SC_01")
         lst.select("SC_02")
@@ -47,7 +49,7 @@ async def test_big_database_loads_only_the_working_schema_and_lets_you_choose(ma
         dlg.action_save()
         await wait_for(pilot, lambda: not isinstance(app.screen, ScopeScreen))
 
-        await wait_for(pilot, lambda: sum("▣" in t for t in labels(tree.root)) >= 2)
+        await wait_for(pilot, lambda: len(schema_rows(tree)) == 3)
         names = " ".join(labels(tree.root))
         assert "SC_01" in names and "SC_02" in names and "SC_03" not in names
         saved = ws.store.load()[0]
@@ -60,11 +62,43 @@ async def test_big_database_loads_only_the_working_schema_and_lets_you_choose(ma
         assert not any("DIM_B" in t for t in labels(node))
         assert any("filtered out" in t for t in labels(node))
 
+        tree.action_refresh()  # chosen once: it does not ask again
+        await wait_for(pilot, lambda: len(schema_rows(tree)) == 3)
+        assert not isinstance(app.screen, ScopeScreen)
+
+
+async def test_cancelling_the_first_prompt_keeps_the_default_and_stops_asking(make_ws):
+    ws = make_ws(Connection("h", "h2", URL.format("scope2")))
+    app = SqlideApp(ws)
+    async with app.run_test(size=(140, 40)) as pilot:
+        await connect_first(pilot, app)
+        await add_schemas(app, 3)
+        app.screen.schema.action_refresh()
+        await wait_for(pilot, lambda: isinstance(app.screen, ScopeScreen))
+        app.screen.action_cancel()
+        await wait_for(pilot, lambda: not isinstance(app.screen, ScopeScreen))
+        await wait_for(pilot, lambda: ws.store.load()[0].schemas == ["PUBLIC"])
+        app.screen.schema.action_refresh()
+        await pilot.pause(0.5)
+        assert not isinstance(app.screen, ScopeScreen)
+
+
+async def test_a_database_with_one_user_schema_does_not_ask(make_ws):
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("scope3"))))
+    async with app.run_test(size=(140, 40)) as pilot:
+        await connect_first(pilot, app)
+        tree = app.screen.schema
+        await wait_for(pilot, lambda: any("PUBLIC" in t for t in labels(tree.root)))
+        assert not isinstance(app.screen, ScopeScreen)
+
 
 async def test_scope_dialog_search_keeps_choices_across_filters(make_ws):
-    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("scope2"))))
+    ws = make_ws(Connection("h", "h2", URL.format("scope4"), schemas=["PUBLIC"]))
+    app = SqlideApp(ws)
     async with app.run_test(size=(140, 40)) as pilot:
-        c, tree = await make_schemas(pilot, app)
+        await connect_first(pilot, app)
+        await add_schemas(app)
+        tree = app.screen.schema
         tree.action_choose_scope()
         await wait_for(pilot, lambda: isinstance(app.screen, ScopeScreen))
         dlg = app.screen
@@ -79,11 +113,12 @@ async def test_scope_dialog_search_keeps_choices_across_filters(make_ws):
         lst.select("SC_11")
         dlg.query_one("#scope-find", Input).value = ""
         await pilot.pause()
-        assert {"sc_05", "sc_11"} <= dlg._chosen
+        assert {"public", "sc_05", "sc_11"} <= dlg._chosen
 
 
 async def test_ddl_does_not_reload_the_tree_until_f5(make_ws):
-    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("scope3"))))
+    ws = make_ws(Connection("h", "h2", URL.format("scope5"), schemas=["PUBLIC", "FRESH"]))
+    app = SqlideApp(ws)
     async with app.run_test(size=(140, 40)) as pilot:
         await connect_first(pilot, app)
         tree = app.screen.schema

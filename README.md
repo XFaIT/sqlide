@@ -20,9 +20,10 @@ Works on Linux, macOS and WSL.
 - **Export.** CSV, TSV, JSON, JSON Lines, Markdown, SQL inserts, HTML, XLSX. Export the loaded
   rows or re-run the query and stream the full result to disk, with progress and cancel.
 - **Schema tree and autocomplete.** Lazy metadata, `SELECT *` on Enter, alias-aware column
-  completion, keywords and functions per dialect. `S` in the tree picks which schemas or
-  databases and which tables (names or globs like `fact_*`) are shown; the choice is saved per
-  connection. A database with hundreds of schemas starts with only the working one.
+  completion, keywords and functions per dialect. Like DataGrip, you choose what to show: on the
+  first connect to a database with several schemas a picker opens (schemas or databases, plus a
+  table name filter such as `fact_*`); until you choose, only the working schema is loaded.
+  `S` in the tree reopens the picker; the choice is saved per connection.
 - **Consoles and files.** Tabs with their own connection; consoles autosave and come back
   after a restart; open and save `.sql` files (`sqlide a.sql b.sql`).
 - **History, formatting, transactions.** Searchable query history, SQL formatting,

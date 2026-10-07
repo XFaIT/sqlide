@@ -15,6 +15,7 @@ from sqlide.db.metadata import (
     Namespace,
     Table,
     is_system_namespace,
+    needs_choice,
     table_matches,
     visible_namespaces,
 )
@@ -31,7 +32,14 @@ class SchemaTree(Tree[object]):
     ]
 
     class ScopeRequested(Message):
-        """The user wants to pick which schemas/databases and tables the tree shows."""
+        """Pick which schemas/databases and tables the tree shows.
+
+        `auto` is the first-connect prompt: the user never chose for this connection.
+        """
+
+        def __init__(self, auto: bool = False) -> None:
+            super().__init__()
+            self.auto = auto
 
     class TableChosen(Message):
         """`action` is "select" (open first rows) or "insert" (put the name into the editor)."""
@@ -102,8 +110,9 @@ class SchemaTree(Tree[object]):
             current = ""
         if meta is not self._meta:
             return  # switched or disconnected while we waited
-        selected = self._conn.schemas if self._conn else []
-        spaces, hidden = visible_namespaces(spaces, current, selected)
+        selected = self._conn.schemas if self._conn else None
+        all_spaces = spaces
+        spaces, hidden = visible_namespaces(all_spaces, current, selected)
         # the working schema first, system schemas last and dimmed
         spaces = sorted(
             spaces, key=lambda n: (is_system_namespace(n.name), n.name.lower() != current)
@@ -122,6 +131,8 @@ class SchemaTree(Tree[object]):
             node.add_leaf(Text(hint, style="dim italic"))
         if opened is not None:
             opened.expand()
+        if self._conn is not None and self._conn.schemas is None and needs_choice(all_spaces):
+            self.post_message(self.ScopeRequested(auto=True))  # first connect: ask, like DataGrip
 
     async def _load_tables(self, meta: MetaCache, node: TreeNode, ns: Namespace) -> None:
         self._placeholder(node)

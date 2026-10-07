@@ -30,9 +30,6 @@ def is_system_namespace(name: str) -> bool:
     return low in _SYSTEM or low.startswith(("pg_temp", "pg_toast"))
 
 
-AUTO_ALL_LIMIT = 20  # up to this many user schemas the tree shows all of them by default
-
-
 @dataclass(frozen=True)
 class Namespace:
     """A schema, or a catalog on databases that have no schemas (MySQL, ClickHouse)."""
@@ -66,24 +63,27 @@ class Column:
 
 
 def visible_namespaces(
-    spaces: list[Namespace], current: str, selected: list[str], limit: int = AUTO_ALL_LIMIT
+    spaces: list[Namespace], current: str, selected: list[str] | None
 ) -> tuple[list[Namespace], int]:
     """The namespaces the tree shows and how many it leaves out.
 
-    `selected` is the user's choice (case-insensitive). Without one, a small database shows
-    everything and a big one (hundreds of schemas) only the working schema.
+    `selected` is the user's choice (case-insensitive); None means nothing was chosen yet.
+    Then a database with one user schema shows everything and one with several shows only the
+    working schema until the user picks (the picker opens by itself, like in DataGrip).
     """
-    if selected:
+    if selected is not None:
         chosen = {n.lower() for n in selected}
         shown = [n for n in spaces if n.name.lower() in chosen]
+    elif sum(1 for n in spaces if not is_system_namespace(n.name)) <= 1:
+        shown = list(spaces)
     else:
-        user = [n for n in spaces if not is_system_namespace(n.name)]
-        if len(user) <= limit:
-            shown = list(spaces)
-        else:
-            shown = [n for n in spaces if current and n.name.lower() == current.lower()]
-            shown = shown or user[:limit]
+        shown = [n for n in spaces if current and n.name.lower() == current.lower()]
     return shown, len(spaces) - len(shown)
+
+
+def needs_choice(spaces: list[Namespace]) -> bool:
+    """Several user schemas and no choice yet: the user should pick which ones to show."""
+    return sum(1 for n in spaces if not is_system_namespace(n.name)) > 1
 
 
 def table_matches(name: str, patterns: str) -> bool:

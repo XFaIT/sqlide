@@ -15,7 +15,7 @@ from sqlide.db.metadata import Namespace, is_system_namespace
 
 
 class ScopeChoice:
-    """`schemas` empty means automatic (small database: all, big one: the working schema)."""
+    """What the user ticked. An empty list means "show no schemas"."""
 
     __slots__ = ("schemas", "table_filter")
 
@@ -79,7 +79,7 @@ class ScopeScreen(ModalScreen[ScopeChoice | None]):
         self._count()
 
     def _count(self) -> None:
-        hint = f"{len(self._chosen)} selected. Nothing selected = automatic."
+        hint = f"{len(self._chosen)} selected. Ctrl+S or OK to apply."
         self.query_one("#scope-count", Label).update(hint)
 
     def on_input_changed(self, event: Input.Changed) -> None:

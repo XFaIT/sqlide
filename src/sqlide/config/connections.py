@@ -23,7 +23,7 @@ class Connection:
     password_cmd: str = ""  # shell-free command whose stdout is the password
     properties: dict[str, str] = field(default_factory=dict)
     autocommit: bool = True
-    schemas: list[str] = field(default_factory=list)  # schemas/databases the tree shows
+    schemas: list[str] | None = None  # schemas/databases the tree shows; None = never chosen
     table_filter: str = ""  # comma-separated globs or substrings; "" = all tables
 
     def __post_init__(self) -> None:
@@ -66,7 +66,7 @@ class ConnectionStore:
 
 
 def _to_dict(c: Connection) -> dict[str, Any]:
-    return {
+    out: dict[str, Any] = {
         "name": c.name,
         "driver": c.driver,
         "url": c.url,
@@ -75,6 +75,8 @@ def _to_dict(c: Connection) -> dict[str, Any]:
         "password_cmd": c.password_cmd,
         "properties": c.properties,
         "autocommit": c.autocommit,
-        "schemas": c.schemas,
         "table_filter": c.table_filter,
     }
+    if c.schemas is not None:  # TOML has no null: absent means "never chosen"
+        out["schemas"] = c.schemas
+    return out

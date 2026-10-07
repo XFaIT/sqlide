@@ -145,9 +145,11 @@ class MainScreen(Screen):
 
     def on_schema_tree_scope_requested(self, msg: SchemaTree.ScopeRequested) -> None:
         msg.stop()
-        self.run_worker(self._choose_scope(self.console), group="scope", exclusive=True)
+        if isinstance(self.app.screen, ScopeScreen):
+            return  # already asking
+        self.run_worker(self._choose_scope(self.console, msg.auto), group="scope", exclusive=True)
 
-    async def _choose_scope(self, console: ConsoleTab) -> None:
+    async def _choose_scope(self, console: ConsoleTab, auto: bool = False) -> None:
         meta, conn = console.meta, console.conn
         if meta is None or conn is None:
             return
@@ -157,11 +159,20 @@ class MainScreen(Screen):
         except DbError as e:
             self._report(e, console)
             return
-        chosen = conn.schemas or [n.name for n in visible_namespaces(spaces, current, [])[0]]
+        chosen = (
+            conn.schemas
+            if conn.schemas is not None
+            else [n.name for n in visible_namespaces(spaces, current, None)[0]]
+        )
         result = await self.app.push_screen_wait(ScopeScreen(spaces, chosen, conn.table_filter))
         if result is None:
-            return
-        conn.schemas, conn.table_filter = result.schemas, result.table_filter
+            if not auto:
+                return
+            conn.schemas = (
+                chosen  # cancelled the first-connect prompt: keep the default, stop asking
+            )
+        else:
+            conn.schemas, conn.table_filter = result.schemas, result.table_filter
         try:
             self.ws.save_connection(conn)
         except ConfigError as e:
