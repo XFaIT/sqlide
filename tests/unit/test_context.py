@@ -79,3 +79,35 @@ def test_unterminated_string_and_comment_at_end_of_text():
     assert ctx("select 'ab|") is None
     assert ctx("select /* ab|") is None
     assert ctx("select 'ab'|").kind == "column"  # right after a closed string is outside it
+
+
+def test_open_backtick_makes_the_name_so_far_the_prefix():
+    c = ctx("select * from `dbt-an|", "databricks")
+    assert (c.kind, c.prefix, c.lead, c.replace_len) == ("table", "dbt-an", 1, 7)
+
+
+def test_open_double_quote_after_a_dot_keeps_the_qualifier():
+    c = ctx('select * from main."dbt-an|')
+    assert (c.kind, c.qualifier, c.prefix, c.replace_len) == ("qualified", ("main",), "dbt-an", 7)
+
+
+def test_closed_quote_is_not_an_open_one():
+    c = ctx("select * from `dbt-analytics` wh|", "databricks")
+    assert (c.prefix, c.lead) == ("wh", 0)
+
+
+def test_qualifier_with_a_hyphen_even_without_quotes():
+    c = ctx("select * from dbt-analytics.|", "databricks")
+    assert (c.kind, c.qualifier, c.prefix) == ("qualified", ("dbt-analytics",), "")
+    c = ctx("select * from `dbt-analytics`.or|", "databricks")
+    assert (c.qualifier, c.prefix) == (("dbt-analytics",), "or")
+
+
+def test_backtick_table_reference_is_recognised_in_databricks():
+    c = ctx("select | from `dbt-analytics`.orders o", "databricks")
+    assert c.tables == [TableRef(("dbt-analytics", "orders"), "o")]
+
+
+def test_doubled_quote_in_a_quoted_name_is_unescaped():
+    c = ctx('select | from "we""ird" t')
+    assert c.tables == [TableRef(('we"ird',), "t")]

@@ -6,6 +6,7 @@ from sqlide.config.connections import Connection
 from sqlide.db.session import DbSession
 from sqlide.drivers.loader import load_driver
 from sqlide.drivers.registry import DriverRegistry
+from sqlide.sql.dialects import dialect_for
 
 
 def create_session(
@@ -21,7 +22,7 @@ def create_session(
         conn.user,
         password,
         conn.properties,
-        defn.dialect,
+        dialect_for(conn.url, defn.dialect),
         conn.autocommit,
     )
 

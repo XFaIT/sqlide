@@ -116,3 +116,34 @@ async def test_a_finished_word_does_not_hijack_enter(make_ws):
         await pilot.press("enter")
         await pilot.pause()
         assert ed.text == "select * from PEOPLE\n"
+
+
+async def test_schema_with_a_hyphen_completes_inside_an_open_quote(make_ws):
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("ac-hyphen"))))
+    async with app.run_test(size=(140, 40)) as pilot:
+        console, ed = await setup(pilot, app, "ac-hyphen")
+        await console.session.execute('create schema "dbt-analytics"')
+        await console.session.execute('create table "dbt-analytics".orders (id int)')
+        console.meta.refresh()
+        ed.text = 'select * from "dbt-an'
+        ed.move_cursor((0, len(ed.text)))
+        await pilot.press("ctrl+space")
+        await wait_for(pilot, lambda: ed.completing)
+        assert [c.text for c in popup(ed)._items] == ['"dbt-analytics"']
+        await pilot.press("enter")
+        await pilot.pause()
+        assert ed.text == 'select * from "dbt-analytics"'  # one pair of quotes, not two
+
+
+async def test_hyphen_schema_qualifier_lists_its_tables(make_ws):
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("ac-hyphen2"))))
+    async with app.run_test(size=(140, 40)) as pilot:
+        console, ed = await setup(pilot, app, "ac-hyphen2")
+        await console.session.execute('create schema "dbt-analytics"')
+        await console.session.execute('create table "dbt-analytics".orders (id int)')
+        console.meta.refresh()
+        ed.text = 'select * from "dbt-analytics".'
+        ed.move_cursor((0, len(ed.text)))
+        await pilot.press("ctrl+space")
+        await wait_for(pilot, lambda: ed.completing)
+        assert [c.text for c in popup(ed)._items] == ["ORDERS"]

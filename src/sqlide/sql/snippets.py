@@ -8,13 +8,35 @@ _SIMPLE = re.compile(r"^[A-Za-z_][A-Za-z0-9_$]*$")
 
 # How an unquoted identifier is case-folded, per dialect. None: case is preserved/ignored.
 _FOLD = {"postgres": str.lower, "oracle": str.upper, "generic": str.upper}
-_QUOTES = {"mysql": ("`", "`"), "clickhouse": ("`", "`"), "mssql": ("[", "]")}
+_QUOTES = {
+    "mysql": ("`", "`"),
+    "clickhouse": ("`", "`"),
+    "databricks": ("`", "`"),
+    "mssql": ("[", "]"),
+}
+
+# Words that cannot be a bare table/column name in most dialects (a table called `order`).
+_RESERVED_WORDS = """
+    ALL ALTER AND ANY AS ASC BETWEEN BY CASE CHECK COLUMN CONSTRAINT CREATE CROSS
+    CURRENT DEFAULT DELETE DESC DISTINCT DROP ELSE END EXCEPT EXISTS FALSE FETCH
+    FOR FOREIGN FROM FULL GRANT GROUP HAVING IN INDEX INNER INSERT INTERSECT INTO
+    IS JOIN KEY LEFT LIKE LIMIT NATURAL NOT NULL OFFSET ON OR ORDER OUTER PRIMARY
+    REFERENCES RIGHT SELECT SET TABLE THEN TO TRUE UNION UNIQUE UPDATE USER USING
+    VALUES VIEW WHEN WHERE WITH
+"""
+RESERVED = frozenset(_RESERVED_WORDS.split())  # noqa: SIM905
 
 
 def quote_ident(name: str, dialect: str) -> str:
-    """Quote `name` only when leaving it bare would change its meaning."""
+    """Quote `name` only when leaving it bare would change its meaning: it has characters
+    other than letters/digits/_ (`dbt-analytics`), it is a reserved word, or the dialect folds
+    case and the name would not survive the fold."""
     fold = _FOLD.get(dialect)
-    if _SIMPLE.match(name) and (fold is None or fold(name) == name):
+    if (
+        _SIMPLE.match(name)
+        and name.upper() not in RESERVED
+        and (fold is None or fold(name) == name)
+    ):
         return name
     left, right = _QUOTES.get(dialect, ('"', '"'))
     return left + name.replace(right, right * 2) + right

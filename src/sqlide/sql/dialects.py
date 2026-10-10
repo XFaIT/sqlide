@@ -78,6 +78,8 @@ RULES: dict[str, Rules] = {
             batch_scoped=_F({"PROCEDURE", "PROC", "FUNCTION", "TRIGGER"}),
         ),
     ),
+    # Databricks / Spark SQL: backtick identifiers, backslash escapes, no case folding
+    "databricks": Rules(backslash_escapes=True, backtick=True),
     "sqlite": Rules(
         backtick=True,
         brackets=True,
@@ -87,6 +89,22 @@ RULES: dict[str, Rules] = {
         ),
     ),
 }
+
+
+# Spark-family JDBC urls: a driver added by hand has dialect "generic", the url tells better
+URL_DIALECTS = (
+    ("jdbc:databricks:", "databricks"),
+    ("jdbc:spark:", "databricks"),
+    ("jdbc:hive2:", "databricks"),
+)
+
+
+def dialect_for(url: str, dialect: str = "generic") -> str:
+    """The driver's dialect, or one recognised from the jdbc url when the driver is generic."""
+    if dialect != "generic":
+        return dialect
+    low = url.lower()
+    return next((d for prefix, d in URL_DIALECTS if low.startswith(prefix)), dialect)
 
 
 def rules_for(dialect: str) -> Rules:

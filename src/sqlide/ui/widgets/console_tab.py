@@ -20,6 +20,7 @@ from sqlide.db.metadata import MetaCache
 from sqlide.db.result import DbError
 from sqlide.db.session import DbSession
 from sqlide.sql.context import analyze
+from sqlide.sql.dialects import dialect_for
 from sqlide.sql.snippets import is_ddl
 from sqlide.ui.widgets.console_export import ExportActions
 from sqlide.ui.widgets.result_grid import ResultGrid
@@ -154,7 +155,7 @@ class ConsoleTab(ExportActions, Vertical):
         self.conn, self.session, self.conn_name = conn, session, conn.name
         self.meta = MetaCache(session)
         self.run_worker(self._open_meta_session(conn, self.meta), group="meta", exclusive=True)
-        self.editor.dialect = self.ws.driver(conn.driver).dialect
+        self.editor.dialect = dialect_for(conn.url, self.ws.driver(conn.driver).dialect)
         self._refresh_tx(message="")
         self.status.update_state(connection=f"{conn.name} ({session.product})")
         self.panel.log_line(f"Connected: {conn.name}: {session.product}", "green")

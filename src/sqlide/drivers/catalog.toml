@@ -101,3 +101,14 @@ dialect = "generic"
 group = "org.duckdb"
 artifact = "duckdb_jdbc"
 classifiers = [""]
+
+[[driver]]
+id = "databricks"
+name = "Databricks / Spark SQL"
+class_name = "com.databricks.client.jdbc.Driver"
+url_template = "jdbc:databricks://{host}:{port}/{database}"
+default_port = 443
+dialect = "databricks"
+group = "com.databricks"
+artifact = "databricks-jdbc"
+classifiers = [""]

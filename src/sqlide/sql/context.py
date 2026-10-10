@@ -56,16 +56,33 @@ class Context:
     prefix: str  # the partial word before the cursor ("" when none)
     qualifier: tuple[str, ...] = ()  # names before the last dot
     tables: list[TableRef] = field(default_factory=list)
+    lead: int = 0  # characters before the prefix that the completion also replaces (open quote)
 
     @property
     def replace_len(self) -> int:
-        return len(self.prefix)
+        return len(self.prefix) + self.lead
+
+
+_CLOSERS = {'"': '"', "`": "`", "[": "]"}
 
 
 def _unquote(s: str) -> str:
     if len(s) >= 2 and s[0] in '"`[' and s[-1] in '"`]':
-        return s[1:-1]
+        close = s[-1]
+        return s[1:-1].replace(close * 2, close)  # `a``b` -> a`b
     return s
+
+
+def _open_quote(text: str, offset: int, toks: list[Token]) -> int | None:
+    """Start of an identifier quote left open before the cursor (`dbt-an|), same line only."""
+    for t in toks:
+        if t.kind != QIDENT or not t.start < offset <= t.end:
+            continue
+        body = text[t.start : t.end]
+        closed = len(body) >= 2 and body[-1] == _CLOSERS[body[0]] and t.end <= len(text)
+        if not closed and "\n" not in text[t.start : offset]:
+            return t.start
+    return None
 
 
 def _statement_bounds(text: str, offset: int, toks: list[Token]) -> tuple[int, int]:
@@ -147,15 +164,20 @@ def analyze(text: str, offset: int, dialect: str = "generic") -> Context | None:
     lo, hi = _statement_bounds(text, offset, toks)
     stmt = _significant(toks, lo, hi)
 
-    # partial word under the cursor
-    p = offset
-    while p > 0 and (text[p - 1].isalnum() or text[p - 1] in "_$"):
-        p -= 1
+    # partial word under the cursor; inside an open `quote it is everything after the quote
+    quote = _open_quote(text, offset, toks)
+    if quote is not None:
+        p = quote + 1
+    else:
+        p = offset
+        while p > 0 and (text[p - 1].isalnum() or text[p - 1] in "_$"):
+            p -= 1
     prefix = text[p:offset]
+    lead = 1 if quote is not None else 0
 
-    # qualifier: name(.name)* followed by a dot, directly before the prefix
+    # qualifier: name(.name)* followed by a dot, directly before the prefix (or open quote)
     qual: list[str] = []
-    q = p
+    q = p - lead
     while q > 0 and text[q - 1] == ".":
         q -= 1
         end = q
@@ -168,14 +190,18 @@ def analyze(text: str, offset: int, dialect: str = "generic") -> Context | None:
             qual.insert(0, text[start + 1 : q - 1])
             q = start
         else:
-            while q > 0 and (text[q - 1].isalnum() or text[q - 1] in "_$"):
+            while q > 0 and (
+                text[q - 1].isalnum()
+                or text[q - 1] in "_$"
+                or (text[q - 1] == "-" and q > 1 and text[q - 2].isalnum())  # dbt-analytics.
+            ):
                 q -= 1
             if q == end:
                 break
             qual.insert(0, text[q:end])
     refs = _table_refs(text, stmt)
     if qual:
-        return Context("qualified", prefix, tuple(qual), refs)
+        return Context("qualified", prefix, tuple(qual), refs, lead)
 
     # nearest clause keyword before the word being typed (ignoring closed sub-selects)
     kind = "column"
@@ -192,4 +218,4 @@ def analyze(text: str, offset: int, dialect: str = "generic") -> Context | None:
             if word in CLAUSE_KEYWORDS:
                 kind = "table" if word in TABLE_KEYWORDS else "column"
                 break
-    return Context(kind, prefix, (), refs)
+    return Context(kind, prefix, (), refs, lead)
