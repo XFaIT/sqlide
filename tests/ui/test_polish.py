@@ -1,6 +1,6 @@
 """Command palette entries, settings screen, driver manager."""
 
-from textual.widgets import Input, OptionList, Switch
+from textual.widgets import Button, Input, OptionList, Switch
 
 from sqlide.app import SqlideApp
 from sqlide.config.settings import load_settings
@@ -51,10 +51,11 @@ async def test_settings_rejects_bad_numbers(make_ws):
         app.main.action_settings()
         await wait_for(pilot, lambda: isinstance(app.screen, SettingsScreen))
         app.screen.query_one("#fetch", Input).value = "0"
-        await pilot.click("#save")
-        await pilot.pause()
+        app.screen.query_one("#save", Button).press()
+        await wait_for(
+            pilot, lambda: "Rows per page" in str(app.screen.query_one("#settings-error").render())
+        )
         assert isinstance(app.screen, SettingsScreen)
-        assert "Rows per page" in str(app.screen.query_one("#settings-error").render())
 
 
 async def test_driver_manager_shows_state_and_adds_custom_jar(make_ws, h2, tmp_path):
