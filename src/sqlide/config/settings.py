@@ -16,6 +16,7 @@ class Settings:
     autosave_consoles: bool = True
     theme: str = "textual-dark"
     history_limit: int = 5000
+    ascii_icons: bool = False  # toolbar labels instead of symbols (terminals with odd fonts)
 
 
 def load_settings(path: Path | None = None) -> Settings:

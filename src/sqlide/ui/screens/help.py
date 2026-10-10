@@ -113,7 +113,10 @@ class HelpScreen(ModalScreen[None]):
             self._apply(found[0])
 
     def _apply(self, action_id: str) -> None:
-        self.app.set_keymap(load_keymap())  # footer-less: the toolbar listens to the signal
+        self.app.set_keymap(load_keymap())
+        main = getattr(self.app, "main", None)
+        if main is not None:
+            main.toolbar.refresh_tips()  # tooltips show the new key at once
         self._fill(action_id)
 
     def action_close(self) -> None:

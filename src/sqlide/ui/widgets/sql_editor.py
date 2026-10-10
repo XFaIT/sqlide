@@ -84,7 +84,7 @@ class SqlEditor(TextArea):
             show_line_numbers=True,
             soft_wrap=False,
             tab_behavior="indent",
-            placeholder="-- connect (sidebar: Enter), then F5 / Ctrl+J runs the framed statement",
+            placeholder="-- connect (sidebar: Enter), then Ctrl+J / F5 runs the framed statement",
             **kw,
         )
         self._dialect = dialect

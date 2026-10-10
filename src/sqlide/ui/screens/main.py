@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+import inspect
 from pathlib import Path
 
 from textual import work
@@ -10,7 +11,7 @@ from textual.app import ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
 from textual.screen import Screen
-from textual.widgets import Footer, Header, ListView, TabbedContent, TabPane
+from textual.widgets import ListView, TabbedContent, TabPane
 
 from sqlide.config._toml import ConfigError
 from sqlide.config.connections import Connection
@@ -35,6 +36,7 @@ from sqlide.ui.widgets.console_tab import ConsoleTab
 from sqlide.ui.widgets.console_tabs import ConsoleTabs
 from sqlide.ui.widgets.result_grid import ResultGrid
 from sqlide.ui.widgets.schema_tree import SchemaTree
+from sqlide.ui.widgets.toolbar import Toolbar
 from sqlide.workspace import Workspace
 
 EXPECTED_ERRORS = (ConfigError, MavenError, DriverError, DbError, JvmNotFound)
@@ -118,15 +120,18 @@ class MainScreen(Screen):
         self._files = files or []
 
     def compose(self) -> ComposeResult:
-        yield Header()
+        yield Toolbar(self.ws.settings.ascii_icons, id="toolbar")
         with Horizontal():
             with Vertical(id="side"):
                 yield ConnectionsList(id="sidebar")
                 yield SchemaTree(id="schema")
             yield ConsoleTabs.build(self.ws, self.ws.consoles.load_state(), self._files, id="tabs")
-        yield Footer()
 
     # --- parts ---
+    @property
+    def toolbar(self) -> Toolbar:
+        return self.query_one("#toolbar", Toolbar)
+
     @property
     def sidebar(self) -> ConnectionsList:
         return self.query_one("#sidebar", ConnectionsList)
@@ -151,6 +156,7 @@ class MainScreen(Screen):
         self.sidebar.focus()
         self._sync_subtitle()
         self.run_worker(self._warm_jvm, thread=True, group="jvm")
+        self.set_interval(0.4, self._sync_toolbar)  # dim/undim buttons; nothing touches a database
         if not self.ws.connections():
             self.console.panel.log_line("No connections yet: press Ctrl+N to add one.", "yellow")
 
@@ -161,6 +167,21 @@ class MainScreen(Screen):
 
     def _reload(self) -> None:
         self.sidebar.reload(self.ws.connections())
+
+    def _sync_toolbar(self) -> None:
+        self.toolbar.sync(self.tabs.active_console)
+
+    async def action_console(self, name: str) -> None:
+        """Toolbar entry point: run `action_<name>` of the active console (or its editor)."""
+        console = self.console
+        target = getattr(console, f"action_{name}", None) or getattr(
+            console.editor, f"action_{name}", None
+        )
+        if target is None:
+            return
+        result = target()
+        if inspect.isawaitable(result):
+            await result
 
     def _sync_subtitle(self) -> None:
         console = self.tabs.active_console
