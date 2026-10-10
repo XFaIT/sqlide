@@ -10,6 +10,7 @@ from sqlide.db.result import Column, DbError
 from sqlide.ui.screens.grid_dialogs import CopyMenu, ValueViewer
 from sqlide.ui.widgets.result_grid import ResultGrid
 from sqlide.ui.widgets.result_view import ResultView
+from tests.ui.helpers import wait_for
 
 COLS = [Column("id", "INT", 4), Column("name", "VARCHAR", 12), Column("note", "VARCHAR", 12)]
 ROWS = [(3, "bob", "x"), (1, "Alice", None), (2, "carol", "line1\nline2")]
@@ -123,10 +124,11 @@ async def test_header_click_sorts_and_shift_click_adds():
     app, size = make_app()
     async with app.run_test(size=size) as pilot:
         g = app.grid
+        await pilot.pause()
         await pilot.click(ResultGrid, offset=(g._gw + 1, 0))
-        assert g.model.sort == [(0, False)]
+        await wait_for(pilot, lambda: g.model.sort == [(0, False)])
         await pilot.click(ResultGrid, offset=(g._gw + g._starts[1] + 1, 0), shift=True)
-        assert g.model.sort == [(0, False), (1, False)]
+        await wait_for(pilot, lambda: g.model.sort == [(0, False), (1, False)])
 
 
 async def test_mouse_click_and_drag_select():

@@ -40,6 +40,7 @@ async def test_clicking_run_executes_the_statement(make_ws):
         await connect_first(pilot, app)
         c = console(app)
         c.editor.text = "select 1 as a"
+        await pilot.pause()
         await pilot.click(IconButton, offset=(1, 0))  # first button: Run
         await wait_for(pilot, lambda: len(grids(app)) == 1 and not c.running)
 

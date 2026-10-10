@@ -2,7 +2,7 @@
 
 import asyncio
 
-from textual.widgets import Input
+from textual.widgets import Button, Input
 
 from sqlide.app import SqlideApp
 from sqlide.config.connections import Connection
@@ -88,7 +88,7 @@ async def test_new_connection_dialog_saves(make_ws, tmp_path):
         await wait_for(pilot, lambda: isinstance(app.screen, ConnectionEditor))
         app.screen.query_one("#name", Input).value = "mine"
         app.screen.query_one("#url", Input).value = "jdbc:h2:mem:x"
-        await pilot.click("#save")
+        app.screen.query_one("#save", Button).press()
         await wait_for(pilot, lambda: isinstance(app.screen, MainScreen))
         assert [c.name for c in ws.connections()] == ["mine"]
         assert len(app.screen.sidebar.children) == 1
@@ -100,10 +100,11 @@ async def test_editor_validates_empty_name(make_ws):
         await pilot.pause()
         await pilot.press("ctrl+n")
         await wait_for(pilot, lambda: isinstance(app.screen, ConnectionEditor))
-        await pilot.click("#save")
-        await pilot.pause()
+        app.screen.query_one("#save", Button).press()
+        await wait_for(
+            pilot, lambda: "name" in str(app.screen.query_one("#error").render()).lower()
+        )
         assert isinstance(app.screen, ConnectionEditor)  # stays open with an error
-        assert "name" in str(app.screen.query_one("#error").render()).lower()
 
 
 async def test_missing_driver_offers_download_and_can_decline(make_ws, tmp_path):
