@@ -405,3 +405,38 @@ async def test_help_rebinds_a_key_and_saves_it(make_ws, tmp_path, monkeypatch):
         c.editor.focus()
         await pilot.press("f4")
         await wait_for(pilot, lambda: len(grids(app)) == 1)
+
+
+async def test_editor_copies_through_the_system_clipboard_and_pastes_from_it(make_ws, monkeypatch):
+    from sqlide import clipboard
+
+    copied = []
+    monkeypatch.setattr(clipboard, "copy_native", lambda text: copied.append(text) or "test")
+    monkeypatch.setattr(clipboard, "paste_native", lambda: "select 42")
+    app = SqlideApp(make_ws())
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        ed = active(app).editor
+        ed.text = "select 1"
+        ed.focus()
+        await pilot.press("ctrl+a", "ctrl+c")  # whole text selected
+        assert copied == ["select 1"]
+        ed.text = ""
+        await pilot.press("ctrl+v")
+        await wait_for(pilot, lambda: ed.text == "select 42")
+
+
+async def test_editor_copy_without_selection_takes_the_line(make_ws, monkeypatch):
+    from sqlide import clipboard
+
+    copied = []
+    monkeypatch.setattr(clipboard, "copy_native", lambda text: copied.append(text) or "test")
+    app = SqlideApp(make_ws())
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        ed = active(app).editor
+        ed.text = "select 1;\nselect 2"
+        ed.focus()
+        ed.move_cursor((1, 3))
+        await pilot.press("ctrl+c")
+        assert copied == ["select 2\n"]

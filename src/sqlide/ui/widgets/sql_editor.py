@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import cast
 
 from rich.color import Color as RichColor
@@ -17,6 +18,7 @@ from textual.strip import Strip
 from textual.timer import Timer
 from textual.widgets import TextArea
 
+from sqlide import clipboard
 from sqlide.db.completion import Candidate
 from sqlide.sql.format import FormatError, format_sql, toggle_line_comments
 from sqlide.sql.splitter import Span, span_lines, split, statement_at
@@ -260,6 +262,41 @@ class SqlEditor(TextArea):
     @property
     def completing(self) -> bool:
         return self._popup is not None and self._popup.shown
+
+    # --- clipboard: system tools first, OSC52 as a fallback, never a silent no-op ---
+    def _current_line_text(self) -> str:
+        row = self.cursor_location[0]
+        return self.document.get_line(row) + self.document.newline
+
+    def action_copy(self) -> None:
+        text = self.selected_text or self._current_line_text()  # no selection: the line
+        if text.strip():
+            name = clipboard.copy(text, self.app)
+            self.app.notify(f"Copied ({name})", timeout=2)
+
+    def action_cut(self) -> None:
+        if self.read_only:
+            return
+        start, end = self.selection
+        text = self.selected_text if start != end else self._current_line_text()
+        if text.strip():
+            clipboard.copy(text, self.app)
+        if start == end:
+            self._delete_cursor_line()
+        else:
+            self._delete_via_keyboard(start, end)
+
+    def action_paste(self) -> None:
+        """Ctrl+V: the system clipboard (also what other programs copied), else the app's own."""
+        if not self.read_only:
+            self.run_worker(self._paste(), group="paste", exclusive=True)
+
+    async def _paste(self) -> None:
+        text = await asyncio.to_thread(clipboard.paste_native)
+        if text is None:
+            text = self.app.clipboard
+        if text and (result := self._replace_via_keyboard(text, *self.selection)):
+            self.move_cursor(result.end_location)
 
     def action_complete(self) -> None:
         self._request_completion(manual=True)

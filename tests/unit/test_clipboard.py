@@ -16,11 +16,13 @@ def test_macos(monkeypatch):
     assert names(platform="darwin", wsl=False) == ["pbcopy"]
 
 
-def test_wsl_prefers_wayland_then_falls_back_to_clip_exe(monkeypatch):
-    monkeypatch.setattr(clipboard.shutil, "which", fake_which("wl-copy", "clip.exe"))
+def test_wsl_prefers_powershell_over_wslg_wayland_and_clip_exe(monkeypatch):
+    monkeypatch.setattr(
+        clipboard.shutil, "which", fake_which("wl-copy", "powershell.exe", "clip.exe")
+    )
     monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
     monkeypatch.delenv("DISPLAY", raising=False)
-    assert names(platform="linux", wsl=True) == ["wl-copy", "clip.exe"]
+    assert names(platform="linux", wsl=True) == ["powershell.exe", "wl-copy", "clip.exe"]
     monkeypatch.setattr(clipboard.shutil, "which", fake_which("clip.exe"))
     assert names(platform="linux", wsl=True) == ["clip.exe"]
 
@@ -66,3 +68,52 @@ def test_copy_native_none_when_nothing_available(monkeypatch):
 def test_windows_uses_clip(monkeypatch):
     monkeypatch.setattr("shutil.which", lambda name: "C:/Windows/System32/clip.exe")
     assert [b[0] for b in clipboard.backends(platform="win32", wsl=False)] == ["clip"]
+
+
+def paste_names(**kw):
+    return [b[0] for b in clipboard.paste_backends(**kw)]
+
+
+def test_paste_backends_per_platform(monkeypatch):
+    monkeypatch.setattr(clipboard.shutil, "which", fake_which("pbpaste", "powershell.exe", "xclip"))
+    monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
+    monkeypatch.setenv("DISPLAY", ":0")
+    assert paste_names(platform="darwin", wsl=False) == ["pbpaste"]
+    assert paste_names(platform="linux", wsl=True) == ["powershell.exe", "xclip"]
+    assert paste_names(platform="linux", wsl=False) == ["xclip"]
+
+
+def test_paste_native_cleans_powershell_output(monkeypatch):
+    monkeypatch.setattr(
+        clipboard, "paste_backends", lambda: [("powershell.exe", ["powershell.exe"])]
+    )
+
+    class Done:
+        stdout = "\ufeffselect 1\r\nfrom t".encode()
+
+    monkeypatch.setattr(clipboard.subprocess, "run", lambda *a, **k: Done())
+    assert clipboard.paste_native() == "select 1\nfrom t"
+
+
+def test_paste_native_none_when_every_tool_fails(monkeypatch):
+    monkeypatch.setattr(clipboard, "paste_backends", lambda: [("bad", ["bad"])])
+
+    def boom(*a, **k):
+        raise OSError
+
+    monkeypatch.setattr(clipboard.subprocess, "run", boom)
+    assert clipboard.paste_native() is None
+
+
+def test_copy_falls_back_to_osc52_and_remembers_text(monkeypatch):
+    monkeypatch.setattr(clipboard, "copy_native", lambda text: None)
+
+    class App:
+        sent = None
+
+        def copy_to_clipboard(self, text):
+            self.sent = text
+
+    app = App()
+    assert clipboard.copy("abc", app) == "terminal clipboard"
+    assert app.sent == "abc"

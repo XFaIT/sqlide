@@ -399,11 +399,9 @@ class ResultGrid(ScrollView, can_focus=True):
         if not len(self.model):
             return
         text = self.render_copy(fmt)
-        used = clipboard.copy_native(text)
-        if used is None:
-            self.app.copy_to_clipboard(text)
+        used = clipboard.copy(text, self.app)
         rows, head = self._selected()
-        self.app.notify(f"Copied {len(rows)}×{len(head)} ({used or 'terminal clipboard'})")
+        self.app.notify(f"Copied {len(rows)}×{len(head)} ({used})")
 
     def action_export(self) -> None:
         if len(self.model):

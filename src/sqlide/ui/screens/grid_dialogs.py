@@ -82,10 +82,8 @@ class ValueViewer(ModalScreen[None]):
     def action_copy(self) -> None:
         from sqlide import clipboard
 
-        name = clipboard.copy_native(self._text)
-        if name is None:
-            self.app.copy_to_clipboard(self._text)
-        self.app.notify(f"Copied value ({name or 'terminal clipboard'})")
+        name = clipboard.copy(self._text, self.app)
+        self.app.notify(f"Copied value ({name})")
 
 
 def describe_cell(column: str, type_name: str, value: Any) -> str:
