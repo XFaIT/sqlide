@@ -5,8 +5,8 @@ class Sqlide < Formula
 
   desc "Terminal SQL IDE (DataGrip-like) over JDBC"
   homepage "https://github.com/XFaIT/sqlide"
-  url "https://files.pythonhosted.org/packages/7a/6c/852d23e357b1c8d0931713687cd7b805e9585c3f36b107b5581420774e71/sqlide-0.2.1.tar.gz"
-  sha256 "e59febadf8054020afd00793f109682828e3b06262742a10d66b1c8a97a4f8a1"
+  url "https://files.pythonhosted.org/packages/47/b7/476f7974e43a7e76a0d70219bd372d9b5b0614434d7fefcd12cbbaf03bd7/sqlide-0.3.0.tar.gz"
+  sha256 "5dd1a47e037e798c3f4e4a2993e21cb536254101e652da4aa203e4c822b0523b"
   license "MIT"
 
   depends_on "openjdk"
