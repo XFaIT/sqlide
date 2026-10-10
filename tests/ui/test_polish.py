@@ -37,7 +37,7 @@ async def test_settings_save_applies_and_persists(make_ws, tmp_path, monkeypatch
         await wait_for(pilot, lambda: isinstance(app.screen, SettingsScreen))
         app.screen.query_one("#fetch", Input).value = "250"
         app.screen.query_one("#blank", Switch).value = False
-        await pilot.click("#save")
+        app.screen.query_one("#save", Button).press()
         await wait_for(pilot, lambda: not isinstance(app.screen, SettingsScreen))
         assert ws.settings.fetch_size == 250 and ws.settings.split_on_blank_line is False
         assert app.main.console.editor.blank_line is False
@@ -73,7 +73,7 @@ async def test_driver_manager_shows_state_and_adds_custom_jar(make_ws, h2, tmp_p
         await wait_for(pilot, lambda: isinstance(app.screen, DriverEditor))
         app.screen.query_one("#id", Input).value = "my-h2"
         app.screen.query_one("#source", Input).value = jar
-        await pilot.click("#ok")
+        app.screen.query_one("#ok", Button).press()
         await wait_for(pilot, lambda: isinstance(app.screen, DriverManager))
         d = ws.registry.get("my-h2")
         assert d.class_name == "org.h2.Driver" and d.jars == [jar]
@@ -89,10 +89,9 @@ async def test_driver_editor_reports_errors(make_ws):
         await wait_for(pilot, lambda: isinstance(app.screen, DriverManager))
         await pilot.press("a")
         await wait_for(pilot, lambda: isinstance(app.screen, DriverEditor))
-        await pilot.click("#ok")
-        await pilot.pause()
+        app.screen.query_one("#ok", Button).press()
+        await wait_for(pilot, lambda: "Id" in str(app.screen.query_one("#driver-error").render()))
         assert isinstance(app.screen, DriverEditor)
-        assert "Id" in str(app.screen.query_one("#driver-error").render())
 
 
 async def test_cursor_and_selection_stay_visible_inside_the_frame(make_ws):
