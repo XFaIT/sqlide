@@ -22,6 +22,7 @@ from sqlide.db.session import DbSession
 from sqlide.sql.context import analyze
 from sqlide.sql.dialects import dialect_for
 from sqlide.sql.snippets import is_ddl
+from sqlide.sql.usage import extract
 from sqlide.ui.widgets.console_export import ExportActions
 from sqlide.ui.widgets.result_grid import ResultGrid
 from sqlide.ui.widgets.result_panel import ResultPanel
@@ -57,6 +58,13 @@ class ConsoleTab(ExportActions, Vertical):
             super().__init__()
             self.console = console
 
+    class UsageChanged(Message):
+        """A statement used tables: the schema tree's Recent list may have changed."""
+
+        def __init__(self, console: ConsoleTab) -> None:
+            super().__init__()
+            self.console = console
+
     class ConnectRequested(Message):
         """The console has no session yet but knows which connection it wants."""
 
@@ -78,6 +86,7 @@ class ConsoleTab(ExportActions, Vertical):
         self.meta_session: DbSession | None = None
         self._executing = False
         self._warned = ""
+        self._usage_cache: dict[str, float] | None = None
         self._autosave: Timer | None = None
         try:
             self._initial, self._newline = ws.consoles.read(path)
@@ -156,6 +165,8 @@ class ConsoleTab(ExportActions, Vertical):
         self.meta = MetaCache(session)
         self.run_worker(self._open_meta_session(conn, self.meta), group="meta", exclusive=True)
         self.editor.dialect = dialect_for(conn.url, self.ws.driver(conn.driver).dialect)
+        self._usage_cache = None
+        self._backfill_usage(conn.name)
         self._refresh_tx(message="")
         self.status.update_state(connection=f"{conn.name} ({session.product})")
         self.panel.log_line(f"Connected: {conn.name}: {session.product}", "green")
@@ -247,7 +258,12 @@ class ConsoleTab(ExportActions, Vertical):
             return
         selected = self.conn.schemas if self.conn else None
         items = await candidates(
-            ctx, self.meta, dialect, selected, self.conn.catalogs if self.conn else None
+            ctx,
+            self.meta,
+            dialect,
+            selected,
+            self.conn.catalogs if self.conn else None,
+            self.usage_scores(),
         )
         if self.meta is not None and self.meta.error and self.meta.error != self._warned:
             self._warned = self.meta.error  # say it once: otherwise "no tables" is a mystery
@@ -293,6 +309,38 @@ class ConsoleTab(ExportActions, Vertical):
             self.ws.history.add(self.conn_name, sql, ok, round(elapsed_s * 1000), error)
         except Exception as e:  # history must never break running queries
             self.app.log.warning(f"history: {e}")
+        if ok:
+            self._record_usage(sql)
+
+    def _record_usage(self, sql: str) -> None:
+        """Count the tables/columns of a successful statement (ranks autocomplete, Recent)."""
+        try:
+            uses = extract(sql, self.editor.dialect)
+            if uses:
+                self.ws.usage.record(self.conn_name, uses)
+                self._usage_cache = None
+                self.post_message(self.UsageChanged(self))
+        except Exception as e:  # counters must never break running queries
+            self.app.log.warning(f"usage: {e}")
+
+    def _backfill_usage(self, name: str) -> None:
+        """First connect after the upgrade: seed the counters from the saved history."""
+        try:
+            if not self.ws.usage.needs_backfill(name):
+                return
+            for entry in reversed(self.ws.history.search(connection=name, only_ok=True, limit=500)):
+                self.ws.usage.record(name, extract(entry.sql, self.editor.dialect), ts=entry.ts)
+            self.ws.usage.mark_backfilled(name)
+        except Exception as e:
+            self.app.log.warning(f"usage backfill: {e}")
+
+    def usage_scores(self) -> dict[str, float]:
+        if self._usage_cache is None:
+            try:
+                self._usage_cache = self.ws.usage.scores(self.conn_name) if self.conn_name else {}
+            except Exception:
+                self._usage_cache = {}
+        return self._usage_cache
 
     async def _run(self, statements: list[str]) -> None:
         session = self.session

@@ -33,6 +33,12 @@ class CatalogRef:
         self.name = name
 
 
+class RecentRef:
+    """Tree data of the "Recent" node: the tables this connection used most lately."""
+
+    __slots__ = ()
+
+
 class SchemaTree(Tree[object]):
     BINDINGS = [
         Binding("f5", "refresh", "Refresh", id="schema.refresh"),
@@ -64,14 +70,23 @@ class SchemaTree(Tree[object]):
         self._meta: MetaCache | None = None
         self._conn: Connection | None = None
         self._label = ""
+        self._recent: list[Table] = []
 
     # --- binding to a connection ---
-    def show(self, meta: MetaCache | None, label: str = "", conn: Connection | None = None) -> None:
+    def show(
+        self,
+        meta: MetaCache | None,
+        label: str = "",
+        conn: Connection | None = None,
+        recent: list[Table] | None = None,
+    ) -> None:
         """Show another connection's metadata (None: disconnected).
 
-        `conn` carries the user's choice of schemas and table filter.
+        `conn` carries the user's choice of schemas and table filter, `recent` the tables
+        its queries used most lately.
         """
         self._meta, self._conn, self._label = meta, conn, label
+        self._recent = recent or []
         self.root.set_label(label or "not connected")
         self.root.remove_children()
         self.root.data = None
@@ -79,6 +94,28 @@ class SchemaTree(Tree[object]):
             self.root.data = meta
             self.root.expand()
             self.run_worker(self._load_namespaces(meta, self.root), group="schema", exclusive=True)
+
+    def set_recent(self, tables: list[Table]) -> None:
+        """Replace the Recent node's tables (a query just used some)."""
+        self._recent = tables
+        if self._meta is None:
+            return
+        old = next((c for c in self.root.children if isinstance(c.data, RecentRef)), None)
+        expanded = old is not None and old.is_expanded
+        if old is not None:
+            old.remove()
+        self._add_recent(self.root, expand=expanded)
+
+    def _add_recent(self, root: TreeNode, expand: bool = False) -> None:
+        if not self._recent:
+            return
+        node = root.add(Text("★ Recent", style="bold"), data=RecentRef(), before=0)
+        for t in self._recent:
+            icon = ICON_VIEW if t.is_view else ICON_TABLE
+            label = Text(f"{icon} {t.namespace + '.' if t.namespace else ''}{t.name}")
+            node.add_leaf(label, data=t)
+        if expand:
+            node.expand()
 
     def action_refresh(self) -> None:
         """F5: the only thing that re-reads the database structure (nothing polls)."""
@@ -127,6 +164,7 @@ class SchemaTree(Tree[object]):
             node.add_leaf(Text(hint, style="dim italic"))
         if opened is not None:
             opened.expand()
+        self._add_recent(node)
         conn = self._conn
         if conn is not None and conn.catalogs is None and conn.schemas is None:
             self.post_message(self.ScopeRequested(auto=True))
@@ -201,6 +239,7 @@ class SchemaTree(Tree[object]):
             node.add_leaf(Text(hint, style="dim italic"))
         if opened is not None:
             opened.expand()
+        self._add_recent(node)
         if self._conn is not None and self._conn.schemas is None and needs_choice(all_spaces):
             self.post_message(self.ScopeRequested(auto=True))  # first connect: ask, like DataGrip
 

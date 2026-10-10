@@ -147,3 +147,24 @@ async def test_hyphen_schema_qualifier_lists_its_tables(make_ws):
         await pilot.press("ctrl+space")
         await wait_for(pilot, lambda: ed.completing)
         assert [c.text for c in popup(ed)._items] == ["ORDERS"]
+
+
+async def test_most_used_table_is_offered_first(make_ws):
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("ac-usage"))))
+    async with app.run_test(size=(140, 40)) as pilot:
+        console, ed = await setup(pilot, app, "ac-usage")
+        await console.session.execute("create table pa (id int)")
+        await console.session.execute("create table pz (id int)")
+        console.meta.refresh()
+        ed.text = "select * from p"
+        ed.move_cursor((0, len(ed.text)))
+        await pilot.press("ctrl+space")
+        await wait_for(pilot, lambda: ed.completing)
+        assert [c.text for c in popup(ed)._items][:3] == ["PA", "PEOPLE", "PZ"]  # alphabetical
+        for _ in range(3):
+            console._record_usage("select * from pz")
+        console._record_usage("select * from pa")
+        await pilot.press("escape")
+        await pilot.press("ctrl+space")
+        await wait_for(pilot, lambda: ed.completing)
+        assert [c.text for c in popup(ed)._items][:3] == ["PZ", "PA", "PEOPLE"]

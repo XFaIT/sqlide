@@ -16,6 +16,7 @@ from sqlide.db.factory import create_session, is_private_database
 from sqlide.db.session import DbSession
 from sqlide.drivers.registry import DriverDef, DriverRegistry
 from sqlide.history import HistoryStore
+from sqlide.history.usage import UsageStore
 from sqlide.jvm.runtime import ensure_jvm
 
 
@@ -28,6 +29,7 @@ class Workspace:
         settings: Settings | None = None,
         consoles: ConsoleStore | None = None,
         history: HistoryStore | None = None,
+        usage: UsageStore | None = None,
     ) -> None:
         self.store = store or ConnectionStore()
         self.registry = registry or DriverRegistry()
@@ -35,6 +37,7 @@ class Workspace:
         self.settings = settings or load_settings()
         self.consoles = consoles or ConsoleStore()
         self.history = history or HistoryStore(limit=self.settings.history_limit)
+        self.usage = usage or UsageStore()
 
     # --- connections ---
     def connections(self) -> list[Connection]:

@@ -17,7 +17,7 @@ from sqlide.config._toml import ConfigError
 from sqlide.config.connections import Connection
 from sqlide.config.settings import save_settings
 from sqlide.consoles import FILE
-from sqlide.db.metadata import visible_namespaces
+from sqlide.db.metadata import Table, visible_namespaces
 from sqlide.db.result import DbError
 from sqlide.drivers.loader import DriverError
 from sqlide.drivers.maven import MavenError
@@ -187,7 +187,24 @@ class MainScreen(Screen):
         console = self.tabs.active_console
         self.app.sub_title = console.conn_name if console else ""
         if console is not None:
-            self.schema.show(console.meta, console.conn_name, console.conn)
+            self.schema.show(console.meta, console.conn_name, console.conn, self._recent(console))
+
+    def _recent(self, console: ConsoleTab) -> list[Table]:
+        try:
+            tops = self.ws.usage.top_tables(console.conn_name) if console.conn_name else []
+        except Exception:  # a broken counters file must not break the tree
+            return []
+        out = []
+        for parts in tops:
+            names = list(parts)
+            if names:
+                out.append(Table(names[-2] if len(names) > 1 else "", names[-1], "TABLE"))
+        return out
+
+    def on_console_tab_usage_changed(self, msg: ConsoleTab.UsageChanged) -> None:
+        msg.stop()
+        if msg.console is self.tabs.active_console:
+            self.schema.set_recent(self._recent(msg.console))
 
     def on_console_tab_schema_changed(self, msg: ConsoleTab.SchemaChanged) -> None:
         """A DDL ran. Nothing re-reads the database by itself: the tree waits for F5."""
@@ -250,7 +267,7 @@ class MainScreen(Screen):
         except ConfigError as e:
             self._report(e, console)
         if console is self.tabs.active_console and console.meta is meta:
-            self.schema.show(meta, console.conn_name, conn)
+            self.schema.show(meta, console.conn_name, conn, self._recent(console))
 
     def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
         if event.tabbed_content is self.tabs:  # not the result tabs inside a console

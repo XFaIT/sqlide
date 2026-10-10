@@ -20,6 +20,18 @@ class Candidate:
     kind: str  # column | table | view | schema | keyword | function
     detail: str = ""
     match: str = ""  # what the typed prefix is compared with, when it differs from `text`
+    rank: float = 0.0  # how much this name was used lately (more first)
+
+
+Usage = dict[str, float]  # `table:schema.t` / `column:schema.t.c` (lowercase) -> decayed uses
+
+
+def _rank(usage: Usage | None, kind: str, *parts: str) -> float:
+    """Uses of schema.table[.col], plus those typed without the schema."""
+    if not usage:
+        return 0.0
+    low = [p.lower() for p in parts]
+    return usage.get(f"{kind}:{'.'.join(low)}", 0.0) + usage.get(f"{kind}:{'.'.join(low[1:])}", 0.0)
 
 
 def _same(a: str, b: str) -> bool:
@@ -56,21 +68,33 @@ async def _resolve(meta: MetaCache, ref_parts: tuple[str, ...]) -> Table | None:
     return next((t for t in await meta.tables(ns) if _same(t.name, name)), None)
 
 
-async def _columns_of(meta: MetaCache, parts: tuple[str, ...], dialect: str) -> list[Candidate]:
+async def _columns_of(
+    meta: MetaCache, parts: tuple[str, ...], dialect: str, usage: Usage | None = None
+) -> list[Candidate]:
     table = await _resolve(meta, parts)
     if table is None:
         return []
     return [
         Candidate(
-            quote_ident(c.name, dialect), "column", c.type_name + (" · pk" if c.primary_key else "")
+            quote_ident(c.name, dialect),
+            "column",
+            c.type_name + (" · pk" if c.primary_key else ""),
+            rank=_rank(usage, "column", table.namespace, table.name, c.name),
         )
         for c in await meta.columns(table)
     ]
 
 
-def _table_candidates(tables: list[Table], dialect: str) -> list[Candidate]:
+def _table_candidates(
+    tables: list[Table], dialect: str, usage: Usage | None = None
+) -> list[Candidate]:
     return [
-        Candidate(quote_ident(t.name, dialect), "view" if t.is_view else "table") for t in tables
+        Candidate(
+            quote_ident(t.name, dialect),
+            "view" if t.is_view else "table",
+            rank=_rank(usage, "table", t.namespace, t.name),
+        )
+        for t in tables
     ]
 
 
@@ -88,16 +112,19 @@ async def candidates(
     dialect: str,
     selected: list[str] | None = None,
     catalogs: list[str] | None = None,
+    usage: Usage | None = None,
 ) -> list[Candidate]:
     """Ranked candidates for `ctx`. A metadata failure degrades to keywords only.
 
     `selected` are the schemas the user chose to show: their tables are offered too.
     The failure is kept in `meta.error` so the UI can tell the user why there are no tables.
+    `usage` (see history/usage.py) puts the names used most recently first.
     """
     found: list[Candidate] = []
     if meta is not None:
         try:
-            found = await _from_metadata(ctx, meta, dialect, selected, catalogs)
+            found = await _from_metadata(ctx, meta, dialect, selected, catalogs, usage)
+            found.sort(key=lambda c: -c.rank)  # stable: unused names keep their order
             meta.error = None
         except DbError as e:
             meta.error = str(e).splitlines()[0] if str(e) else repr(e)
@@ -127,9 +154,10 @@ async def _from_metadata(
     dialect: str,
     selected: list[str] | None,
     catalogs: list[str] | None,
+    usage: Usage | None = None,
 ) -> list[Candidate]:
     if ctx.kind == "qualified":
-        return await _qualified(ctx, meta, dialect)
+        return await _qualified(ctx, meta, dialect, usage)
     out: list[Candidate] = []
     if ctx.kind == "table":
         spaces = await meta.namespaces()
@@ -144,13 +172,14 @@ async def _from_metadata(
             at_home = _same(ns.name, current) and _same(ns.catalog, current_cat)
             for t in await meta.tables(ns):
                 kind = "view" if t.is_view else "table"
+                rank = _rank(usage, "table", t.namespace, t.name)
                 if at_home or not (ns.name or ns.catalog):
-                    out.append(Candidate(quote_ident(t.name, dialect), kind))
+                    out.append(Candidate(quote_ident(t.name, dialect), kind, rank=rank))
                 else:  # another schema or catalog: insert the name that works from here
                     here = ns.catalog if ns.catalog != current_cat else ""
                     text = qualified_name([here, ns.name, t.name], dialect)
                     detail = ".".join(p for p in (ns.catalog, ns.name) if p)
-                    out.append(Candidate(text, kind, detail, match=t.name))
+                    out.append(Candidate(text, kind, detail, match=t.name, rank=rank))
         names = spaces if selected is None else shown  # no choice yet: every schema name helps
         out += [Candidate(quote_ident(n.name, dialect), "schema") for n in names if n.name]
         if await meta.catalogs():  # three-level names: `catalog.schema.table`
@@ -159,7 +188,7 @@ async def _from_metadata(
         return out
     # column context: columns of every table the statement mentions
     for ref in ctx.tables:
-        out += await _columns_of(meta, ref.parts, dialect)
+        out += await _columns_of(meta, ref.parts, dialect, usage)
     return out
 
 
@@ -179,15 +208,17 @@ async def _chosen_elsewhere(
     return out
 
 
-async def _qualified(ctx: Context, meta: MetaCache, dialect: str) -> list[Candidate]:
+async def _qualified(
+    ctx: Context, meta: MetaCache, dialect: str, usage: Usage | None = None
+) -> list[Candidate]:
     q = ctx.qualifier
     ref = next((t for t in ctx.tables if t.alias and _same(t.alias, q[-1])), None)
     if ref is not None:
-        return await _columns_of(meta, ref.parts, dialect)
+        return await _columns_of(meta, ref.parts, dialect, usage)
     if len(q) == 1:
         ns = await _find_namespace(meta, q[0])
         if ns is not None:
-            return _table_candidates(await meta.tables(ns), dialect)
+            return _table_candidates(await meta.tables(ns), dialect, usage)
         catalog = await _find_catalog(meta, q[0])
         if catalog is not None:  # `catalog.` -> its schemas
             return [
@@ -198,6 +229,6 @@ async def _qualified(ctx: Context, meta: MetaCache, dialect: str) -> list[Candid
         catalog = await _find_catalog(meta, q[0])
         ns = await _find_schema(meta, catalog, q[1]) if catalog else None
         if ns is not None:  # `catalog.schema.` -> its tables
-            return _table_candidates(await meta.tables(ns), dialect)
+            return _table_candidates(await meta.tables(ns), dialect, usage)
     # table-name qualifier: `users.` or `schema.users.`
-    return await _columns_of(meta, q, dialect)
+    return await _columns_of(meta, q, dialect, usage)

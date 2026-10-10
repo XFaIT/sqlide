@@ -2,7 +2,7 @@
 
 from sqlide.app import SqlideApp
 from sqlide.config.connections import Connection
-from tests.ui.helpers import connect_first, grids, wait_for
+from tests.ui.helpers import connect_first, console, grids, wait_for
 
 URL = "jdbc:h2:mem:{};DB_CLOSE_DELAY=-1"
 
@@ -74,3 +74,24 @@ async def test_tree_empty_when_disconnected(make_ws):
     async with app.run_test(size=(140, 40)) as pilot:
         await pilot.pause()
         assert str(app.screen.schema.root.label) == "not connected"
+
+
+async def test_recent_node_lists_used_tables_first(make_ws):
+    from sqlide.ui.widgets.schema_tree import RecentRef
+
+    app = SqlideApp(
+        make_ws(Connection("h", "h2", "jdbc:h2:mem:recent1;DB_CLOSE_DELAY=-1", schemas=["PUBLIC"]))
+    )
+    async with app.run_test(size=(140, 40)) as pilot:
+        await connect_first(pilot, app)
+        c = console(app)
+        await c.session.execute("create table pz (id int)")
+        c._record_usage("select * from pz")
+        c._record_usage("select * from pz")
+        await wait_for(
+            pilot,
+            lambda: any(isinstance(n.data, RecentRef) for n in app.screen.schema.root.children),
+        )
+        node = next(n for n in app.screen.schema.root.children if isinstance(n.data, RecentRef))
+        assert node is app.screen.schema.root.children[0]
+        assert [str(ch.label) for ch in node.children] == ["▤ pz"]
