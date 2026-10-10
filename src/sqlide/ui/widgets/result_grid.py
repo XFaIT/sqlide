@@ -73,6 +73,8 @@ class ResultGrid(ScrollView, can_focus=True):
         Binding("l", "load_more", "More rows", show=False, id="grid.load_more"),
         Binding("L", "load_all", "All rows", show=False, id="grid.load_all"),
         Binding("e", "export", "Export", id="grid.export"),
+        Binding("p", "pin", "Pin result", id="grid.pin"),
+        Binding("w", "close_result", "Close result", id="grid.close"),
     ]
 
     class Summary(Message):
@@ -402,6 +404,22 @@ class ResultGrid(ScrollView, can_focus=True):
         used = clipboard.copy(text, self.app)
         rows, head = self._selected()
         self.app.notify(f"Copied {len(rows)}×{len(head)} ({used})")
+
+    class PinRequested(Message):
+        def __init__(self, grid: ResultGrid) -> None:
+            super().__init__()
+            self.grid = grid
+
+    class CloseRequested(Message):
+        def __init__(self, grid: ResultGrid) -> None:
+            super().__init__()
+            self.grid = grid
+
+    def action_pin(self) -> None:
+        self.post_message(self.PinRequested(self))
+
+    def action_close_result(self) -> None:
+        self.post_message(self.CloseRequested(self))
 
     def action_export(self) -> None:
         if len(self.model):

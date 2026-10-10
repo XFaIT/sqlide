@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
 from pathlib import Path
 from time import monotonic
 from typing import cast
@@ -15,22 +17,30 @@ from textual.widgets import TextArea
 
 from sqlide.config.connections import Connection
 from sqlide.consoles import CONSOLE, FILE, TabState
-from sqlide.db.completion import candidates
+from sqlide.db.completion import candidates, resolve_table
 from sqlide.db.metadata import MetaCache
 from sqlide.db.result import DbError
 from sqlide.db.session import DbSession
+from sqlide.history.results import SavedResult
 from sqlide.sql.context import analyze
 from sqlide.sql.dialects import dialect_for
 from sqlide.sql.snippets import is_ddl
-from sqlide.sql.usage import extract
+from sqlide.sql.usage import Use, extract
 from sqlide.ui.widgets.console_export import ExportActions
 from sqlide.ui.widgets.result_grid import ResultGrid
-from sqlide.ui.widgets.result_panel import ResultPanel
+from sqlide.ui.widgets.result_panel import MAX_PINNED, ResultPanel
 from sqlide.ui.widgets.sql_editor import SqlEditor
 from sqlide.ui.widgets.status_bar import StatusBar
 from sqlide.workspace import Workspace
 
 AUTOSAVE_S = 1.0
+
+
+def result_title(sql: str, n: int, dialect: str) -> str:
+    """`orders · 12:41`: the first table the statement reads, and when it ran."""
+    table = next((u.parts[-1] for u in extract(sql, dialect) if u.kind == "table"), "")
+    name = table if table and len(table) <= 24 else f"Result {n}"
+    return f"{name} · {time.strftime('%H:%M')}"
 
 
 def one_line(sql: str, limit: int = 100) -> str:
@@ -96,7 +106,7 @@ class ConsoleTab(ExportActions, Vertical):
 
     def compose(self) -> ComposeResult:
         yield SqlEditor(self._initial, blank_line=self.ws.settings.split_on_blank_line, id="editor")
-        yield ResultPanel(id="results")
+        yield ResultPanel(self.ws.settings.ascii_icons, id="results")
         yield StatusBar(id="status")
 
     # --- parts ---
@@ -162,7 +172,7 @@ class ConsoleTab(ExportActions, Vertical):
     async def attach(self, conn: Connection, session: DbSession) -> None:
         await self.detach()
         self.conn, self.session, self.conn_name = conn, session, conn.name
-        self.meta = MetaCache(session)
+        self.meta = MetaCache(session, self.ws.meta_store.for_connection(conn.name, conn.url))
         self.run_worker(self._open_meta_session(conn, self.meta), group="meta", exclusive=True)
         self.editor.dialect = dialect_for(conn.url, self.ws.driver(conn.driver).dialect)
         self._usage_cache = None
@@ -191,6 +201,16 @@ class ConsoleTab(ExportActions, Vertical):
             await self.session.close()
         self.conn = self.session = self.meta = None
         self.status.update_state(connection="not connected", tx="", message="")
+
+    def on_mount(self) -> None:
+        self.run_worker(self._restore_results(), group="restore-results")
+
+    def forget_results(self) -> None:
+        """The tab was closed by the user: its saved results go with it."""
+        try:
+            self.ws.results.forget(str(self.path))
+        except Exception as e:
+            self.app.log.warning(f"results: {e}")
 
     async def shutdown(self) -> None:
         """Called when the tab goes away: persist text, cancel work, close the connection."""
@@ -244,6 +264,108 @@ class ConsoleTab(ExportActions, Vertical):
             self.post_message(self.SchemaChanged(self))
         self.panel.log_line("Committed" if commit else "Rolled back", "green")
         self._refresh_tx(message="committed" if commit else "rolled back")
+
+    # --- result tabs: pin, close, copy, export, re-run, keep between sessions ---
+    def _active_grid(self) -> ResultGrid | None:
+        pane_id = self.panel.active_result_id
+        return self.panel.grid_of(pane_id) if pane_id else None
+
+    def action_pin_result(self) -> None:
+        pane_id = self.panel.active_result_id
+        if pane_id is None:
+            return
+        state = self.panel.toggle_pin(pane_id)
+        if state is None:
+            self.app.notify(
+                f"At most {MAX_PINNED} pinned results: close one first", severity="warning"
+            )
+            return
+        self.panel.sync_bar()
+        self.app.notify(
+            "Result pinned: new runs open next to it" if state else "Result unpinned", timeout=2
+        )
+        self.persist_results()
+
+    async def action_close_result(self) -> None:
+        pane_id = self.panel.active_result_id
+        if pane_id is not None:
+            await self.panel.close_result(pane_id)
+            self.panel.sync_bar()
+            self.persist_results()
+
+    def action_copy_result(self) -> None:
+        grid = self._active_grid()
+        if grid is not None:
+            grid.copy("tsv")
+
+    def action_export_result(self) -> None:
+        grid = self._active_grid()
+        if grid is not None:
+            grid.action_export()
+
+    def action_rerun_result(self) -> None:
+        grid = self._active_grid()
+        if grid is not None and grid.sql.strip():
+            self.run_statements([grid.sql])
+
+    def on_result_grid_pin_requested(self, msg: ResultGrid.PinRequested) -> None:
+        msg.stop()
+        pane_id = self.panel.pane_id_of(msg.grid)
+        if pane_id is not None:
+            self.panel.tabs.active = pane_id
+            self.action_pin_result()
+
+    async def on_result_grid_close_requested(self, msg: ResultGrid.CloseRequested) -> None:
+        msg.stop()
+        pane_id = self.panel.pane_id_of(msg.grid)
+        if pane_id is not None:
+            await self.panel.close_result(pane_id)
+            self.panel.sync_bar()
+            self.persist_results()
+            self.panel.focus_active()
+
+    def persist_results(self) -> None:
+        """Save the result tabs (pinned ones and the latest) so a restart brings them back."""
+        if not self.is_mounted:
+            return
+        snaps = self.panel.snapshots()
+        self.run_worker(
+            asyncio.to_thread(self._save_results, str(self.path), snaps),
+            group="persist-results",
+            exclusive=True,
+        )
+
+    def _save_results(self, key: str, snaps: list[SavedResult]) -> None:
+        try:
+            self.ws.results.replace(key, snaps)
+        except Exception as e:  # saved results are a convenience, never an error
+            self.app.log.warning(f"results: {e}")
+
+    async def _restore_results(self) -> None:
+        try:
+            saved = await asyncio.to_thread(self.ws.results.load, str(self.path))
+        except Exception as e:
+            self.app.log.warning(f"results: {e}")
+            return
+        for r in saved:
+            await self.panel.add_result(
+                r.title,
+                r.columns,
+                r.rows,
+                None,
+                self.ws.settings.fetch_size,
+                r.sql,
+                pinned=r.pinned,
+                stamp=r.ts,
+            )
+        if saved:
+            note = f"Restored {len(saved)} saved result(s) from the last session"
+            cut = [r for r in saved if r.truncated]
+            self.panel.log_line(
+                note + (f" ({len(cut)} cut to the loaded rows)" if cut else ""), "dim"
+            )
+            self.panel.show_first_result()
+            self.panel.sync_bar()
 
     # --- autocomplete ---
     def on_sql_editor_completion_requested(self, message: SqlEditor.CompletionRequested) -> None:
@@ -320,8 +442,25 @@ class ConsoleTab(ExportActions, Vertical):
                 self.ws.usage.record(self.conn_name, uses)
                 self._usage_cache = None
                 self.post_message(self.UsageChanged(self))
+                if self.is_running and self.meta is not None:
+                    self.run_worker(self._prefetch_columns(uses), group="prefetch", exclusive=True)
         except Exception as e:  # counters must never break running queries
             self.app.log.warning(f"usage: {e}")
+
+    async def _prefetch_columns(self, uses: list[Use]) -> None:
+        """Read the columns of the tables a query used, so their autocomplete is instant (and
+        saved to the disk snapshot). Errors are ignored: this is only a head start."""
+        meta = self.meta
+        if meta is None:
+            return
+        try:
+            for use in uses:
+                if use.kind == "table":
+                    table = await resolve_table(meta, use.parts)
+                    if table is not None:
+                        await meta.columns(table)
+        except Exception as e:
+            self.app.log.debug(f"prefetch: {e}")
 
     def _backfill_usage(self, name: str) -> None:
         """First connect after the upgrade: seed the counters from the saved history."""
@@ -371,7 +510,7 @@ class ConsoleTab(ExportActions, Vertical):
                     if item.has_rows:
                         n_results += 1
                         grid = await self.panel.add_result(
-                            f"Result {n_results}",
+                            result_title(sql, n_results, self.editor.dialect),
                             item.columns,
                             item.rows,
                             item.cursor,
@@ -392,3 +531,5 @@ class ConsoleTab(ExportActions, Vertical):
             self._executing = False
             self._refresh_tx(message=last)
             self.panel.show_first_result()
+            self.panel.sync_bar()
+            self.persist_results()

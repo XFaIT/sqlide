@@ -50,7 +50,7 @@ async def _find_schema(meta: MetaCache, catalog: str, name: str) -> Namespace | 
     return next((n for n in await meta.schemas_of(catalog) if _same(n.name, name)), None)
 
 
-async def _resolve(meta: MetaCache, ref_parts: tuple[str, ...]) -> Table | None:
+async def resolve_table(meta: MetaCache, ref_parts: tuple[str, ...]) -> Table | None:
     """Table named by `ref_parts`: (table,), (schema, table) or (catalog, schema, table)."""
     name = ref_parts[-1] if ref_parts else ""
     if not name:
@@ -71,7 +71,7 @@ async def _resolve(meta: MetaCache, ref_parts: tuple[str, ...]) -> Table | None:
 async def _columns_of(
     meta: MetaCache, parts: tuple[str, ...], dialect: str, usage: Usage | None = None
 ) -> list[Candidate]:
-    table = await _resolve(meta, parts)
+    table = await resolve_table(meta, parts)
     if table is None:
         return []
     return [

@@ -168,3 +168,22 @@ async def test_most_used_table_is_offered_first(make_ws):
         await pilot.press("ctrl+space")
         await wait_for(pilot, lambda: ed.completing)
         assert [c.text for c in popup(ed)._items][:3] == ["PZ", "PA", "PEOPLE"]
+
+
+async def test_columns_survive_a_restart_from_the_disk_snapshot(make_ws):
+    ws = make_ws(Connection("h", "h2", "jdbc:h2:mem:ac-snap;DB_CLOSE_DELAY=-1"))
+    app = SqlideApp(ws)
+    async with app.run_test(size=(140, 40)) as pilot:
+        console, ed = await setup(pilot, app, "ac-snap")
+        ed.text = "select * from people"
+        await pilot.press("ctrl+j")
+        await wait_for(pilot, lambda: not console.running)
+        await wait_for(pilot, lambda: bool(console.meta._columns))  # prefetched in the background
+        console.meta.flush()
+    # a new session on the same data dir: the snapshot answers without asking the database
+    app2 = SqlideApp(ws)
+    async with app2.run_test(size=(140, 40)) as pilot:
+        await connect_first(pilot, app2)
+        meta = app2.screen.console.meta
+        assert meta.cached_at is not None
+        assert any(c.name == "FULL_NAME" for cols in meta._columns.values() for c in cols)

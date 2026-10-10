@@ -5,13 +5,16 @@ Pure data + one class that needs a session; nothing here knows about the UI.
 
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import fnmatch
+import time
 from dataclasses import dataclass
 from typing import Any
 
 import jpype
 
+from sqlide.db.meta_store import MetaDisk
 from sqlide.db.session import DbSession, _db_error
 
 # Databases whose catalogs can all be read and queried through one connection, so the tree
@@ -139,8 +142,11 @@ def _rows(rs: Any, *cols: str) -> list[tuple[Any, ...]]:
 class MetaCache:
     """Per-session cache. Every getter loads once; `refresh()` drops it."""
 
-    def __init__(self, session: DbSession) -> None:
+    def __init__(self, session: DbSession, disk: MetaDisk | None = None) -> None:
         self._s = session
+        self._disk = disk
+        self._save_handle: asyncio.TimerHandle | None = None
+        self.cached_at: float | None = None  # set while the data comes from the disk snapshot
         self._namespaces: list[Namespace] | None = None
         self._current: str | None = None
         self._catalogs: list[str] | None = None
@@ -149,12 +155,111 @@ class MetaCache:
         self._tables: dict[str, list[Table]] = {}
         self._columns: dict[tuple[str, str, str], list[Column]] = {}
         self.error: str | None = None  # last metadata failure seen by autocomplete
+        if disk is not None:
+            self._restore(disk.load())
+
+    # --- disk snapshot ---
+    def _restore(self, data: dict[str, Any] | None) -> None:
+        """Fill the cache from a snapshot. The working schema/catalog are never stored: they
+        change with `USE` and are cheap to ask for."""
+        if not data:
+            return
+        try:
+            ns = lambda d: Namespace(d["name"], d["is_catalog"], d["catalog"])  # noqa: E731
+            catalogs = data["catalogs"]
+            if catalogs is not None and not isinstance(catalogs, list):
+                return
+            namespaces = [ns(d) for d in data["namespaces"]] if data["namespaces"] else None
+            catalog_schemas = {c: [ns(d) for d in v] for c, v in data["catalog_schemas"].items()}
+            tables = {
+                k: [
+                    Table(t["namespace"], t["name"], t["kind"], t["is_catalog"], t["catalog"])
+                    for t in v
+                ]
+                for k, v in data["tables"].items()
+            }
+            columns = {
+                (e["k"][0], e["k"][1], e["k"][2]): [
+                    Column(c["name"], c["type_name"], c["nullable"], c["primary_key"])
+                    for c in e["cols"]
+                ]
+                for e in data["columns"]
+            }
+            ts = float(data["ts"])
+        except (KeyError, TypeError, ValueError, AttributeError):
+            return  # a snapshot we do not understand: start empty
+        self._catalogs = catalogs
+        self._namespaces = namespaces if not catalogs else None  # three-level: derived again
+        self._catalog_schemas = catalog_schemas
+        self._tables = tables
+        self._columns = columns
+        self.cached_at = ts
+
+    def _snapshot(self) -> dict[str, Any]:
+        def ns(n: Namespace) -> dict[str, Any]:
+            return {"name": n.name, "is_catalog": n.is_catalog, "catalog": n.catalog}
+
+        return {
+            "ts": time.time(),
+            "catalogs": self._catalogs,  # None: not read yet
+            "namespaces": [ns(n) for n in self._namespaces or []],
+            "catalog_schemas": {c: [ns(n) for n in v] for c, v in self._catalog_schemas.items()},
+            "tables": {
+                k: [
+                    {
+                        "namespace": t.namespace,
+                        "name": t.name,
+                        "kind": t.kind,
+                        "is_catalog": t.is_catalog,
+                        "catalog": t.catalog,
+                    }
+                    for t in v
+                ]
+                for k, v in self._tables.items()
+            },
+            "columns": [
+                {
+                    "k": list(k),
+                    "cols": [
+                        {
+                            "name": c.name,
+                            "type_name": c.type_name,
+                            "nullable": c.nullable,
+                            "primary_key": c.primary_key,
+                        }
+                        for c in v
+                    ],
+                }
+                for k, v in self._columns.items()
+            ],
+        }
+
+    def _changed(self) -> None:
+        """Something was read from the database: save a snapshot soon (debounced)."""
+        if self._disk is None or self._save_handle is not None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        self._save_handle = loop.call_later(1.5, self.flush)
+
+    def flush(self) -> None:
+        self._save_handle = None
+        if self._disk is not None:
+            self._disk.save(self._snapshot())
 
     def use(self, session: DbSession) -> None:
         """Read from another session (a dedicated one) from now on; the cache stays."""
         self._s = session
 
     def refresh(self) -> None:
+        if self._save_handle is not None:
+            self._save_handle.cancel()
+            self._save_handle = None
+        if self._disk is not None:
+            self._disk.drop()
+        self.cached_at = None
         self._namespaces = None
         self._current = None
         self._catalogs = None
@@ -172,12 +277,14 @@ class MetaCache:
                 self._namespaces = await self.schemas_of(await self.current_catalog())
             else:
                 self._namespaces = await self._s.call(self._load_namespaces)
+            self._changed()
         return self._namespaces
 
     async def catalogs(self) -> list[str]:
         """Catalog names when schemas live in several catalogs (three-level names), else []."""
         if self._catalogs is None:
             self._catalogs = await self._s.call(lambda c: self._load_catalogs(c, self._s.url))
+            self._changed()
         return self._catalogs
 
     @staticmethod
@@ -208,6 +315,7 @@ class MetaCache:
             self._catalog_schemas[catalog] = await self._s.call(
                 lambda c: self._load_schemas_of(c, catalog)
             )
+            self._changed()
         return self._catalog_schemas[catalog]
 
     @staticmethod
@@ -253,6 +361,7 @@ class MetaCache:
     async def tables(self, ns: Namespace) -> list[Table]:
         if ns.key not in self._tables:
             self._tables[ns.key] = await self._s.call(lambda c: self._load_tables(c, ns))
+            self._changed()
         return self._tables[ns.key]
 
     @staticmethod
@@ -272,6 +381,7 @@ class MetaCache:
         key = (table.catalog, table.namespace, table.name)
         if key not in self._columns:
             self._columns[key] = await self._s.call(lambda c: self._load_columns(c, table))
+            self._changed()
         return self._columns[key]
 
     @staticmethod

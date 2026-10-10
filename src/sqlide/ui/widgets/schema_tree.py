@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import time
+
 from rich.text import Text
 from textual.binding import Binding
 from textual.message import Message
@@ -87,7 +89,7 @@ class SchemaTree(Tree[object]):
         """
         self._meta, self._conn, self._label = meta, conn, label
         self._recent = recent or []
-        self.root.set_label(label or "not connected")
+        self.root.set_label(self._root_label())
         self.root.remove_children()
         self.root.data = None
         if meta is not None:
@@ -122,6 +124,13 @@ class SchemaTree(Tree[object]):
         if self._meta is not None:
             self._meta.refresh()
             self.show(self._meta, self._label, self._conn)
+
+    def _root_label(self) -> str:
+        label = self._label or "not connected"
+        at = self._meta.cached_at if self._meta is not None else None
+        if at:  # shown from the disk snapshot: it can be old, F5 reads the database again
+            label += f"  ◷ cached {time.strftime('%d.%m %H:%M', time.localtime(at))}"
+        return label
 
     def mark_stale(self) -> None:
         """A DDL statement ran: the cache is dropped, but the tree waits for F5."""

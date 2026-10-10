@@ -13,9 +13,11 @@ from sqlide.config.secrets import PasswordResolver
 from sqlide.config.settings import Settings, load_settings
 from sqlide.consoles import ConsoleStore
 from sqlide.db.factory import create_session, is_private_database
+from sqlide.db.meta_store import MetaStore
 from sqlide.db.session import DbSession
 from sqlide.drivers.registry import DriverDef, DriverRegistry
 from sqlide.history import HistoryStore
+from sqlide.history.results import ResultStore
 from sqlide.history.usage import UsageStore
 from sqlide.jvm.runtime import ensure_jvm
 
@@ -30,6 +32,8 @@ class Workspace:
         consoles: ConsoleStore | None = None,
         history: HistoryStore | None = None,
         usage: UsageStore | None = None,
+        meta_store: MetaStore | None = None,
+        results: ResultStore | None = None,
     ) -> None:
         self.store = store or ConnectionStore()
         self.registry = registry or DriverRegistry()
@@ -38,6 +42,8 @@ class Workspace:
         self.consoles = consoles or ConsoleStore()
         self.history = history or HistoryStore(limit=self.settings.history_limit)
         self.usage = usage or UsageStore()
+        self.meta_store = meta_store or MetaStore()
+        self.results = results or ResultStore()
 
     # --- connections ---
     def connections(self) -> list[Connection]:

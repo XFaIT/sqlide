@@ -83,6 +83,7 @@ class ConsoleTabs(TabbedContent):
     async def close_console(self, console: ConsoleTab) -> None:
         pane = console.parent
         await console.shutdown()
+        console.forget_results()
         if isinstance(pane, TabPane) and pane.id:
             await self.remove_pane(pane.id)
         if not self.consoles():

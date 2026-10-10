@@ -109,6 +109,51 @@ TOOLS: tuple[Tool, ...] = (
 )
 
 
+# Buttons above the result tabs (they act on the active result)
+RESULT_TOOLS: tuple[Tool, ...] = (
+    Tool(
+        "📌",
+        "Pin",
+        "Pin result",
+        "Keep this result: new runs open next to it, not over it",
+        "console('pin_result')",
+        "grid.pin",
+    ),
+    Tool(
+        "⧉",
+        "Copy",
+        "Copy result",
+        "Copy the selected cells (or the whole result) as TSV",
+        "console('copy_result')",
+        "grid.copy",
+    ),
+    Tool(
+        "⤓",
+        "Save",
+        "Export result",
+        "Export to CSV, XLSX, JSON, ...",
+        "console('export_result')",
+        "grid.export",
+    ),
+    Tool(
+        "↻",
+        "Rerun",
+        "Run again",
+        "Run the query of this result again",
+        "console('rerun_result')",
+        "",
+    ),
+    Tool(
+        "✕",
+        "Close",
+        "Close result",
+        "Close this result tab",
+        "console('close_result')",
+        "grid.close",
+    ),
+)
+
+
 class IconButton(Static):
     DEFAULT_CSS = """
     IconButton { width: auto; min-width: 3; height: 1; padding: 0 1; content-align: center middle; }

@@ -45,6 +45,10 @@ class GridModel:
     def total_rows(self) -> int:
         return len(self._rows)
 
+    def loaded_rows(self) -> list[Row]:
+        """Every loaded row in arrival order (ignores sort and filter)."""
+        return list(self._rows)
+
     def row(self, view_row: int) -> Row:
         return self._rows[self._view[view_row]]
 

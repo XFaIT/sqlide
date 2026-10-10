@@ -93,3 +93,5 @@ ScopeScreen { align: center middle; }
 #rebind-box { width: 50; height: auto; padding: 1 2; border: round $primary; background: $surface; align-horizontal: center; }
 #rebind-title { text-style: bold; }
 RebindScreen { align: center middle; }
+
+ResultBar IconButton { min-width: 3; }
