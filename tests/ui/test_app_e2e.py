@@ -91,7 +91,7 @@ async def test_new_connection_dialog_saves(make_ws, tmp_path):
         app.screen.query_one("#save", Button).press()
         await wait_for(pilot, lambda: isinstance(app.screen, MainScreen))
         assert [c.name for c in ws.connections()] == ["mine"]
-        assert len(app.screen.sidebar.children) == 1
+        await wait_for(pilot, lambda: len(app.screen.sidebar.children) == 1)
 
 
 async def test_editor_validates_empty_name(make_ws):
