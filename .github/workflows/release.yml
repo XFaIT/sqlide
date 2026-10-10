@@ -1,12 +1,38 @@
 name: Release
 
+# Every push to main with a version that has no v<version> tag yet is a release:
+# CI green -> PyPI (needs your approval) -> tag -> PR in the Homebrew tap (its brew install
+# tests run on the PR; merge it when they are green).
 on:
   push:
-    tags: ["v*"]
+    branches: [main]
+
+concurrency:
+  group: release
+  cancel-in-progress: false
 
 jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      new: ${{ steps.v.outputs.new }}
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: v
+        run: |
+          version=$(python3 -c 'import tomllib;print(tomllib.load(open("pyproject.toml","rb"))["project"]["version"])')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null 2>&1; then
+            echo "new=false" >> "$GITHUB_OUTPUT"; echo "v$version is already released"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"; echo "releasing $version"
+          fi
+
   ci-green:
     # Never publish a commit whose CI is red or missing.
+    needs: detect
+    if: needs.detect.outputs.new == 'true'
     runs-on: ubuntu-latest
     permissions:
       checks: read
@@ -28,7 +54,8 @@ jobs:
           echo "::error::CI did not finish for $GITHUB_SHA"; exit 1
 
   pypi:
-    needs: ci-green
+    needs: [detect, ci-green]
+    if: needs.detect.outputs.new == 'true'
     runs-on: ubuntu-latest
     environment: pypi
     permissions:
@@ -39,11 +66,24 @@ jobs:
       - run: uv build
       - run: uv publish
 
+  tag:
+    needs: [detect, pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Tag the released commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api -X POST "repos/$GITHUB_REPOSITORY/git/refs" \
+            -f ref="refs/tags/v${{ needs.detect.outputs.version }}" -f sha="$GITHUB_SHA"
+
   homebrew:
     # Opens a PR in the tap with the new url/sha256 once the sdist is on PyPI.
     # Needs the TAP_TOKEN secret: a fine-grained token for XFaIT/homebrew-sqlide
     # with Contents and Pull requests read/write.
-    needs: pypi
+    needs: [detect, tag]
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.TAP_TOKEN }}
@@ -52,7 +92,7 @@ jobs:
         run: test -n "$GH_TOKEN" || { echo "::error::secret TAP_TOKEN is not set"; exit 1; }
       - name: Wait for the sdist on PyPI
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${{ needs.detect.outputs.version }}"
           for _ in $(seq 1 60); do
             curl -sf "https://pypi.org/pypi/sqlide/$version/json" -o pypi.json && \
               python3 -I - "$version" <<'PY' && exit 0
@@ -66,7 +106,7 @@ jobs:
           echo "::error::sqlide $version never appeared on PyPI"; exit 1
       - name: Open the tap PR
         run: |
-          version="${GITHUB_REF_NAME#v}"
+          version="${{ needs.detect.outputs.version }}"
           . ./formula.env
           gh repo clone XFaIT/homebrew-sqlide tap -- -q
           cd tap
