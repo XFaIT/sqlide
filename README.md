@@ -29,6 +29,20 @@ Works on Linux, macOS and WSL.
   `database.schema.table` names.
 - **Consoles and files.** Tabs with their own connection; consoles autosave and come back
   after a restart; open and save `.sql` files (`sqlide a.sql b.sql`).
+- **Toolbar.** One row of icons instead of a footer; hover for the name, the key and what
+  it does. `ascii_icons = true` in `settings.toml` shows words instead of symbols.
+- **Results that stay.** A new run only replaces unpinned result tabs; pin one (`p`, or the
+  pin button above the tabs) to keep it next to the next results. Pinned tabs and the latest
+  results are saved and come back after a restart. Buttons: pin, copy, export, run again, close.
+- **Remembers what you use.** Tables and columns your queries touched rank first in
+  autocomplete and appear under *Recent* in the schema tree. Schema structure is saved per
+  connection, so the tree and autocomplete are ready right after a restart (`F5` re-reads it).
+- **Names quoted only when needed** (`dbt-analytics`, reserved words), with the right quote for
+  the database: backticks on Databricks/Spark, MySQL and ClickHouse, brackets on SQL Server,
+  double quotes elsewhere.
+- **Clipboard that works.** Copy and paste go through the system clipboard (`pbcopy`/`pbpaste`,
+  PowerShell on WSL, `wl-copy`, `xclip`), falling back to the terminal's OSC52 escape. `Ctrl+V`
+  pastes what other programs copied.
 - **History, formatting, transactions.** Searchable query history, SQL formatting,
   Auto/Manual commit with Commit/Rollback.
 - **Rebindable keys, themes, command palette** (`Ctrl+P`). No AI features.
@@ -69,21 +83,27 @@ in memory until you quit. A connection can instead read it from an environment v
 
 | Action | Keys |
 |---|---|
-| Run statement / selection | `F5`, `Ctrl+J`, `Ctrl+Enter`\* |
-| Run all | `Shift+F5` |
-| Cancel query | `Ctrl+F2` |
-| Autocomplete | `Ctrl+Space` (opens by itself after a dot) |
-| Format / comment | `F7` or `Ctrl+Alt+L` / `Ctrl+/` or `Alt+/` |
-| New connection / console / close tab | `Ctrl+N` / `Ctrl+T` / `Alt+W` |
+| Run statement / selection | `Ctrl+J` (= `Ctrl+Enter`), `F5` |
+| Run all | `Ctrl+R`, `Shift+F5` |
+| Cancel query | `Ctrl+B`, `Ctrl+F2` |
+| Autocomplete | `Ctrl+Space` (opens by itself while you type a word and after a dot) |
+| Format / comment | `Ctrl+L`, `F7` / `Ctrl+/` |
+| Select all / copy / cut / paste | `Ctrl+A` / `Ctrl+C` / `Ctrl+X` / `Ctrl+V` |
+| New connection / console / close tab | `Ctrl+N` / `Ctrl+T` / `Ctrl+W` |
 | Open / save file | `Ctrl+O` / `Ctrl+S` |
-| History | `Alt+E` |
-| Switch tab | `Alt+←` `Alt+→` |
-| Focus connections / schema / editor / results | `Alt+C` / `Alt+D` / `Alt+Q` / `Alt+R` (or `F6` / `Shift+F6` to cycle) |
-| Tx: toggle / commit / rollback | `F8` / `F9` / `F10` |
-| Grid: sort / copy / copy as / filter / export | `s` / `Ctrl+C` / `y` / `/` / `e` |
-| Help: all keys | `F1` |
+| History | `Ctrl+E` |
+| Switch tab | `Ctrl+PgDn` / `Ctrl+PgUp` |
+| Focus connections / schema / editor / results | `Ctrl+K` / `Ctrl+D` / `Alt+Q` / `Ctrl+G` (or `F6` / `Shift+F6` to cycle) |
+| Tx: toggle / commit / rollback | `F8` / `F9` / `F10` (also buttons in the toolbar) |
+| Grid: sort / copy / copy as / filter / export | `s` / `Ctrl+C` / `y` / `Ctrl+F` / `e` |
+| Grid: pin result / close result | `p` / `w` |
+| Help: all keys, change a key | `F1` |
 | Command palette | `Ctrl+P` |
 | Quit | `Ctrl+Q` |
+
+Every key is shown as it is bound *now*: the toolbar tooltips, `F1` and `sqlide keys` read
+`keymap.toml`. In `F1`, `Enter` on a row asks for a new key and saves it; `Backspace` resets it.
+The older Alt/F keys stay as second choices unless you rebind the action.
 
 \* Most terminals send `Ctrl+Enter` as plain `Enter`; it only works where the terminal
 speaks the kitty keyboard protocol. `Alt+Enter` is not used on purpose: it toggles
@@ -95,6 +115,7 @@ full screen in Windows Terminal.
 |---|---|
 | Settings, connections, custom drivers, keymap | `~/.config/sqlide/` |
 | Downloaded drivers, history, consoles | `~/.local/share/sqlide/` |
+| Saved schema structure, usage counters, saved results | `meta/`, `usage.sqlite`, `results.sqlite` next to them |
 
 Override with `SQLIDE_CONFIG_DIR` and `SQLIDE_DATA_DIR`.
 
