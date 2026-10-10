@@ -39,7 +39,7 @@ Works on Linux, macOS and WSL.
   <img alt="Installing sqlide and running sqlide doctor" src="https://raw.githubusercontent.com/XFaIT/sqlide/main/docs/img/start.gif" width="860">
 </p>
 
-**Autocomplete that knows your schemas** (even `dbt-analytics`), names quoted only when
+**Autocomplete that knows your schemas** (even `retail-eu`), names quoted only when
 needed, and results you can **pin** so the next run opens next to them:
 
 <p align="center">
@@ -77,7 +77,7 @@ needed, and results you can **pin** so the next run opens next to them:
 - **Remembers what you use.** Tables and columns your queries touched rank first in
   autocomplete and appear under *Recent* in the schema tree. Schema structure is saved per
   connection, so the tree and autocomplete are ready right after a restart (`F5` re-reads it).
-- **Names quoted only when needed** (`dbt-analytics`, reserved words), with the right quote for
+- **Names quoted only when needed** (`retail-eu`, reserved words), with the right quote for
   the database: backticks on Databricks/Spark, MySQL and ClickHouse, brackets on SQL Server,
   double quotes elsewhere.
 - **Clipboard that works.** Copy and paste go through the system clipboard (`pbcopy`/`pbpaste`,

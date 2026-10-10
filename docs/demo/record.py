@@ -24,13 +24,13 @@ COLS, ROWS = 112, 30
 DEMO_SQL = """\
 -- Ctrl+J runs the statement inside the frame, Ctrl+R runs the whole file
 select c.country, count(*) as orders, round(sum(o.amount), 2) as revenue
-from "dbt-analytics".orders o
-join "dbt-analytics".customers c on c.id = o.customer_id
+from "retail-eu".orders o
+join "retail-eu".customers c on c.id = o.customer_id
 where o.status <> 'refunded'
 group by c.country
 order by revenue desc;
 
-select * from "dbt-analytics".orders where status = 'refunded';
+select * from "retail-eu".orders where status = 'refunded';
 """
 
 
@@ -124,7 +124,7 @@ def prepare() -> dict[str, str]:
     (ENV / "cfg" / "connections.toml").write_text(
         '[[connection]]\nname = "shop"\ndriver = "h2"\n'
         f'url = "jdbc:h2:{ENV / "data" / "shop"}"\nuser = "sa"\n'
-        'password_ref = "${env:SQLIDE_DEMO_PW}"\nschemas = ["PUBLIC", "dbt-analytics"]\n'
+        'password_ref = "${env:SQLIDE_DEMO_PW}"\nschemas = ["PUBLIC", "retail-eu"]\n'
     )
     (ENV / "demo.sql").write_text(DEMO_SQL)
     return {
@@ -158,7 +158,7 @@ def scene_query(env: dict[str, str]) -> None:
 
 
 def scene_complete(env: dict[str, str]) -> None:
-    """Autocomplete across schemas (even `dbt-analytics`), then pinned results."""
+    """Autocomplete across schemas (even `retail-eu`), then pinned results."""
     (ENV / "scratch.sql").write_text("")
     r = Rec("demo_complete", f"cd {ROOT} && uv run sqlide {ENV / 'scratch.sql'}", env)
     r.pause(2.5)
@@ -166,7 +166,7 @@ def scene_complete(env: dict[str, str]) -> None:
     r.wait_for("Connected: shop")
     r.keys("F6", hold=0.5)
     r.keys("F6", hold=0.5)
-    r.type('select * from "dbt-an', hold=1.2)
+    r.type('select * from "retail-e', hold=1.2)
     r.keys("Tab", hold=0.6)
     r.type(".", hold=1.4)
     r.type("ord", hold=0.8)
@@ -182,7 +182,7 @@ def scene_complete(env: dict[str, str]) -> None:
     for _ in range(3):  # results -> connections -> schema -> editor
         r.keys("F6", hold=0.4)
     r.keys("C-a", "BSpace", hold=0.4)
-    r.type('select status, count(*) as n from "dbt-analytics".orders group by status;', cps=40)
+    r.type('select status, count(*) as n from "retail-eu".orders group by status;', cps=40)
     r.keys("C-j", hold=0.5)
     r.wait_for("STATUS", hold=2.5)
     r.save(OUT / "complete.cast")

@@ -8,5 +8,5 @@ agg --font-family "DejaVu Sans Mono" --font-size 16 --idle-time-limit 2 \
     docs/demo/query.cast docs/img/query.gif   # https://github.com/asciinema/agg
 ```
 
-`seed.py` builds the demo database (H2 file with a `dbt-analytics` schema). Needs tmux,
+`seed.py` builds the demo database (H2 file with a `retail-eu` schema). Needs tmux,
 `agg` and the H2 driver in `tests/.cache` (run the test suite once to download it).

@@ -24,13 +24,13 @@ async def main(data_dir: Path, password: str) -> None:
     session = DbSession(loaded, f"jdbc:h2:{data_dir / 'shop'}", "sa", password, dialect="generic")
     await session.open()
     rnd = random.Random(7)
-    await session.execute('create schema if not exists "dbt-analytics"')
+    await session.execute('create schema if not exists "retail-eu"')
     await session.execute(
-        'create table if not exists "dbt-analytics".customers '
+        'create table if not exists "retail-eu".customers '
         "(id int primary key, name varchar(40), country varchar(20))"
     )
     await session.execute(
-        'create table if not exists "dbt-analytics".orders (id int primary key, '
+        'create table if not exists "retail-eu".orders (id int primary key, '
         "customer_id int, amount decimal(10,2), status varchar(12), created date)"
     )
     names = [
@@ -50,14 +50,14 @@ async def main(data_dir: Path, password: str) -> None:
     for i, name in enumerate(names, 1):
         country = rnd.choice(COUNTRIES)
         await session.execute(
-            f"merge into \"dbt-analytics\".customers values ({i}, '{name}', '{country}')"
+            f"merge into \"retail-eu\".customers values ({i}, '{name}', '{country}')"
         )
     day = dt.date(2026, 9, 1)
     for i in range(1, 61):
         amount = round(rnd.uniform(9, 480), 2)
         when = day + dt.timedelta(days=rnd.randrange(40))
         await session.execute(
-            f'merge into "dbt-analytics".orders values ({i}, {rnd.randint(1, len(names))}, '
+            f'merge into "retail-eu".orders values ({i}, {rnd.randint(1, len(names))}, '
             f"{amount}, '{rnd.choice(STATUSES)}', '{when}')"
         )
     await session.close()
