@@ -6,3 +6,6 @@ __pycache__/
 dist/
 tests/.cache/
 .claude/
+
+# README demo recordings (regenerate with docs/demo/record.py)
+docs/demo/*.cast

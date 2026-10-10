@@ -1,10 +1,50 @@
-# sqlide
+<h1 align="center">sqlide</h1>
 
-A DataGrip-style SQL IDE that runs in your terminal. Connect to any database over JDBC,
-write SQL in an editor that outlines the statement about to run, and browse results in
-sortable, copyable tables that export to CSV, XLSX and more.
+<p align="center">
+  A DataGrip-style SQL IDE that lives in your terminal.<br>
+  Any JDBC database, a framed statement you run with one key, sortable and copyable results.
+</p>
+
+<p align="center">
+  <a href="https://github.com/XFaIT/sqlide/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/XFaIT/sqlide/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://pypi.org/project/sqlide/"><img alt="PyPI" src="https://img.shields.io/pypi/v/sqlide?color=3775A9&logo=pypi&logoColor=white"></a>
+  <a href="https://pypi.org/project/sqlide/"><img alt="Python" src="https://img.shields.io/pypi/pyversions/sqlide?logo=python&logoColor=white"></a>
+  <a href="https://pypi.org/project/sqlide/"><img alt="Downloads" src="https://img.shields.io/pypi/dm/sqlide?color=blueviolet"></a>
+  <a href="https://github.com/XFaIT/homebrew-sqlide"><img alt="Homebrew" src="https://img.shields.io/badge/brew-XFaIT%2Fsqlide-FBB040?logo=homebrew&logoColor=white"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/github/license/XFaIT/sqlide?color=green"></a>
+</p>
+
+<p align="center">
+  <img alt="Platforms" src="https://img.shields.io/badge/platform-Linux%20%C2%B7%20macOS%20%C2%B7%20WSL-lightgrey">
+  <img alt="JDBC" src="https://img.shields.io/badge/database-any%20JDBC-orange?logo=openjdk&logoColor=white">
+  <a href="https://github.com/Textualize/textual"><img alt="Built with Textual" src="https://img.shields.io/badge/built%20with-Textual-5b21b6"></a>
+  <a href="https://github.com/astral-sh/ruff"><img alt="Ruff" src="https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json"></a>
+  <img alt="No AI features" src="https://img.shields.io/badge/AI-none-lightgrey">
+</p>
+
+<p align="center">
+  <img alt="Run a statement, sort, filter and copy the result" src="https://raw.githubusercontent.com/XFaIT/sqlide/main/docs/img/query.gif" width="860">
+</p>
+
+Connect to any database over JDBC, write SQL in an editor that outlines the statement
+about to run, and browse results in sortable, copyable tables that export to CSV, XLSX and more.
 
 Works on Linux, macOS and WSL.
+
+## In action
+
+**Install and start** (real output of `uv tool install sqlide`):
+
+<p align="center">
+  <img alt="Installing sqlide and running sqlide doctor" src="https://raw.githubusercontent.com/XFaIT/sqlide/main/docs/img/start.gif" width="860">
+</p>
+
+**Autocomplete that knows your schemas** (even `dbt-analytics`), names quoted only when
+needed, and results you can **pin** so the next run opens next to them:
+
+<p align="center">
+  <img alt="Autocomplete across schemas and pinned result tabs" src="https://raw.githubusercontent.com/XFaIT/sqlide/main/docs/img/complete.gif" width="860">
+</p>
 
 ## Features
 
@@ -53,11 +93,17 @@ Requirements: Python 3.12+ and a Java 11+ runtime (`brew install openjdk`,
 `apt install openjdk-21-jre`, ...). Check with `sqlide doctor`.
 
 ```sh
+# macOS (Homebrew installs Java for you)
+brew tap XFaIT/sqlide
+brew install sqlide
+
+# any OS with Python 3.12+ and Java
 uv tool install sqlide        # or: pipx install sqlide
 sqlide
 ```
 
-Homebrew formula: see [packaging/homebrew](packaging/homebrew/README.md).
+Update with `brew upgrade sqlide` or `uv tool upgrade sqlide`. Homebrew formula: see
+[packaging/homebrew](packaging/homebrew/README.md).
 
 ## Quick start
 
