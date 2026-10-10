@@ -49,10 +49,13 @@ async def test_close_and_unpin_with_the_buttons(make_ws):
         await run(pilot, c, "select 1 as a")
         await pilot.pause(0.5)
         assert not bar_button(app, "Pin result").has_class("-off")
+        await pilot.pause()
         await pilot.click(bar_button(app, "Pin result"))
         await wait_for(pilot, lambda: len(c.panel.pinned_ids) == 1)
+        await pilot.pause()
         await pilot.click(bar_button(app, "Pin result"))
         await wait_for(pilot, lambda: len(c.panel.pinned_ids) == 0)
+        await pilot.pause()
         await pilot.click(bar_button(app, "Close result"))
         await wait_for(pilot, lambda: len(grids(app)) == 0)
         assert bar_button(app, "Close result").has_class("-off")  # only the log is left
@@ -86,5 +89,6 @@ async def test_rerun_runs_the_query_again(make_ws):
         await run(pilot, c, "select 1 as a")
         c.editor.text = ""
         await pilot.pause(0.5)
+        await pilot.pause()
         await pilot.click(bar_button(app, "Run again"))
         await wait_for(pilot, lambda: len(grids(app)) == 1 and not c.running)
