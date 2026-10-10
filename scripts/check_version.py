@@ -1,5 +1,8 @@
 """PR guard: branch name `<version>/<slug>`, version bumped above the base branch.
 
+The bump is only required when the PR touches `src/` (docs, tests and CI changes
+may keep the current version).
+
 Usage: check_version.py <branch> <base-ref>   (e.g. 0.3.1/fix-x origin/main)
 """
 
@@ -32,20 +35,29 @@ def main(branch: str, base: str) -> int:
         ["git", "show", f"{base}:pyproject.toml"], capture_output=True, text=True, check=True
     ).stdout
     old = tomllib.loads(old_toml)["project"]["version"]
-    if m and branch.split("/")[0] != current:
-        errors.append(f"branch version {branch.split('/')[0]} != pyproject version {current}")
-    if parse(current) <= parse(old):
-        errors.append(f"version {current} must be greater than {old} on {base} (no downgrade)")
+    changed = subprocess.run(
+        ["git", "diff", "--name-only", f"{base}...HEAD"], capture_output=True, text=True, check=True
+    ).stdout.split()
+    touches_src = any(f.startswith("src/") for f in changed)
+    if parse(current) < parse(old):
+        errors.append(f"version {current} is lower than {old} on {base} (no downgrade)")
+    if touches_src:
+        if m and branch.split("/")[0] != current:
+            errors.append(f"branch version {branch.split('/')[0]} != pyproject version {current}")
+        if parse(current) <= parse(old):
+            errors.append(f"src/ changed: version {current} must be greater than {old} on {base}")
     tags = subprocess.run(
         ["git", "tag", "--list", "v*"], capture_output=True, text=True, check=True
     ).stdout.split()
     released = [parse(t[1:]) for t in tags if re.fullmatch(r"v\d+\.\d+\.\d+", t)]
-    if released and parse(current) <= max(released):
+    if released and touches_src and parse(current) <= max(released):
         errors.append(f"version {current} is not above the latest released tag")
+    if released and parse(current) < max(released):
+        errors.append(f"version {current} is below the latest released tag")
     for e in errors:
         print(f"::error::{e}")
     if not errors:
-        print(f"ok: {branch}, {old} -> {current}")
+        print(f"ok: {branch}, {old} -> {current} (src changed: {touches_src})")
     return 1 if errors else 0
 
 
