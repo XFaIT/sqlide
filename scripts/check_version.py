@@ -25,7 +25,7 @@ def parse(v: str) -> tuple[int, int, int]:
 def main(branch: str, base: str) -> int:
     errors: list[str] = []
     m = BRANCH.match(branch)
-    if not m:
+    if not m and not branch.startswith("dependabot/"):
         errors.append(f"branch {branch!r} must look like 0.3.1/short-description")
     current = tomllib.loads(Path("pyproject.toml").read_text())["project"]["version"]
     init = re.search(r'__version__ = "([^"]+)"', Path("src/sqlide/__init__.py").read_text())

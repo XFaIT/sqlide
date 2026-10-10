@@ -5,7 +5,30 @@ on:
     tags: ["v*"]
 
 jobs:
+  ci-green:
+    # Never publish a commit whose CI is red or missing.
+    runs-on: ubuntu-latest
+    permissions:
+      checks: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Wait for CI on the tagged commit
+        run: |
+          for _ in $(seq 1 90); do
+            runs=$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/check-runs" --paginate \
+              --jq '.check_runs[] | select(.name | startswith("test (")) | .conclusion // "pending"')
+            echo "$runs"
+            if [ "$(echo "$runs" | grep -c .)" -ge 2 ] && ! echo "$runs" | grep -q pending; then
+              echo "$runs" | grep -qv '^success$' && { echo "::error::CI is not green on $GITHUB_SHA"; exit 1; }
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "::error::CI did not finish for $GITHUB_SHA"; exit 1
+
   pypi:
+    needs: ci-green
     runs-on: ubuntu-latest
     environment: pypi
     permissions:

@@ -103,7 +103,7 @@ sqlide
 ```
 
 Update with `brew upgrade sqlide` or `uv tool upgrade sqlide`. Homebrew formula: see
-[packaging/homebrew](packaging/homebrew/README.md).
+[XFaIT/homebrew-sqlide](https://github.com/XFaIT/homebrew-sqlide).
 
 ## Quick start
 
