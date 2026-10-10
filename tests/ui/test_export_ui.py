@@ -43,7 +43,7 @@ async def test_export_whole_result_reruns_query_and_streams(make_ws, tmp_path):
         assert dlg.query_one("#scope", RadioSet).pressed_button.id == "all"  # more rows exist
         out = tmp_path / "all.csv"
         dlg.query_one("#path", Input).value = str(out)
-        await pilot.click("#export")
+        dlg.query_one("#export", Button).press()
         await wait_for(pilot, lambda: out.exists() and not console(app)._exporting)
         rows = list(csv.reader(out.open(newline="")))
         assert rows[0] == ["X", "LABEL"] and len(rows) == 201 and rows[-1] == ["200", "v200"]
@@ -68,7 +68,7 @@ async def test_export_view_respects_sort_and_filter_and_swaps_extension(make_ws,
         assert path.value.endswith(".xlsx")  # extension followed the format
         out = tmp_path / "view.xlsx"
         path.value = str(out)
-        await pilot.click("#export")
+        dlg.query_one("#export", Button).press()
         await wait_for(pilot, lambda: out.exists() and not console(app)._exporting)
         ws_ = load_workbook(out).active
         assert [r[0].value for r in ws_.iter_rows(min_row=2)] == [
@@ -98,7 +98,7 @@ async def test_export_selection_scope(make_ws, tmp_path):
         dlg.query_one("#format", Select).value = "json"
         await pilot.pause()
         dlg.query_one("#path", Input).value = str(out)
-        await pilot.click("#export")
+        dlg.query_one("#export", Button).press()
         await wait_for(pilot, lambda: out.exists() and not console(app)._exporting)
         import json
 
@@ -139,7 +139,7 @@ async def test_export_failure_is_reported_not_fatal(make_ws, tmp_path):
         await run_query(pilot, app, "select 1 as a")
         dlg = await open_export(pilot, app)
         dlg.query_one("#path", Input).value = str(blocker / "sub" / "x.csv")
-        await pilot.click("#export")
+        dlg.query_one("#export", Button).press()
         await wait_for(pilot, lambda: console(app).status.message == "export failed")
         await wait_for(pilot, lambda: any("Export failed" in n.title for n in app._notifications))
         assert isinstance(app.screen, MainScreen)
