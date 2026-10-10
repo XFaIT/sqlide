@@ -2,7 +2,7 @@ name: Release
 
 # Every push to main with a version that has no v<version> tag yet is a release:
 # CI green -> PyPI (needs your approval) -> tag -> PR in the Homebrew tap (its brew install
-# tests run on the PR; merge it when they are green).
+# tests run on the PR, and it merges itself when they are green).
 on:
   push:
     branches: [main]
@@ -80,7 +80,8 @@ jobs:
             -f ref="refs/tags/v${{ needs.detect.outputs.version }}" -f sha="$GITHUB_SHA"
 
   homebrew:
-    # Opens a PR in the tap with the new url/sha256 once the sdist is on PyPI.
+    # Opens a PR in the tap with the new url/sha256 once the sdist is on PyPI and turns on
+    # auto-merge, so the tap's brew tests decide whether it lands.
     # Needs the TAP_TOKEN secret: a fine-grained token for XFaIT/homebrew-sqlide
     # with Contents and Pull requests read/write.
     needs: [detect, tag]
@@ -119,3 +120,4 @@ jobs:
           git push -q origin "release/$version"
           gh pr create -R XFaIT/homebrew-sqlide -B main -H "release/$version" \
             -t "sqlide $version" -b "url and sha256 of the $version sdist on PyPI. Opened by the release workflow."
+          gh pr merge -R XFaIT/homebrew-sqlide "release/$version" --auto --squash --delete-branch
