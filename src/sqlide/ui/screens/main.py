@@ -41,22 +41,41 @@ EXPECTED_ERRORS = (ConfigError, MavenError, DriverError, DbError, JvmNotFound)
 
 
 class MainScreen(Screen):
+    # Ctrl first: it is the key shown in the toolbar and help. The old Alt/F keys stay as
+    # second choices. Alt+digits never reach us in most terminals (Textual maps ESC+digit to
+    # Mac Option characters), so focus actions use letters, and F6 cycles the panes.
     BINDINGS = [
         Binding("ctrl+n", "new_connection", "New connection", id="main.new_connection"),
         Binding("ctrl+t", "new_console", "New console", id="main.new_console"),
         Binding(
-            "ctrl+f4,alt+w", "close_console", "Close tab", priority=True, id="main.close_console"
+            "ctrl+w,ctrl+f4,alt+w",
+            "close_console",
+            "Close tab",
+            priority=True,
+            id="main.close_console",
         ),
-        Binding("ctrl+alt+e,alt+e", "history", "History", priority=True, id="main.history"),
+        Binding("ctrl+e,alt+e", "history", "History", priority=True, id="main.history"),
         Binding("f1", "help", "Help", id="main.help"),
         Binding("ctrl+o", "open_file", "Open file", id="main.open_file"),
         Binding("ctrl+s", "save_file", "Save", id="main.save_file"),
-        Binding("alt+right", "tab(1)", "Next tab", show=False, id="main.next_tab"),
-        Binding("alt+left", "tab(-1)", "Previous tab", show=False, id="main.prev_tab"),
-        # Alt+digits never reach us in most terminals (Textual maps ESC+digit to Mac Option
-        # characters), so each focus action also has an Alt+letter, and F6 cycles the panes.
         Binding(
-            "alt+c,alt+1",
+            "ctrl+pagedown,alt+right",
+            "tab(1)",
+            "Next tab",
+            show=False,
+            priority=True,
+            id="main.next_tab",
+        ),
+        Binding(
+            "ctrl+pageup,alt+left",
+            "tab(-1)",
+            "Previous tab",
+            show=False,
+            priority=True,
+            id="main.prev_tab",
+        ),
+        Binding(
+            "ctrl+k,alt+c,alt+1",
             "focus_sidebar",
             "Connections",
             False,
@@ -64,13 +83,23 @@ class MainScreen(Screen):
             id="main.focus_sidebar",
         ),
         Binding(
-            "alt+d,alt+4", "focus_schema", "Schema", False, priority=True, id="main.focus_schema"
+            "ctrl+d,alt+d,alt+4",
+            "focus_schema",
+            "Schema",
+            False,
+            priority=True,
+            id="main.focus_schema",
         ),
         Binding(
             "alt+q,alt+2", "focus_editor", "Editor", False, priority=True, id="main.focus_editor"
         ),
         Binding(
-            "alt+r,alt+3", "focus_results", "Results", False, priority=True, id="main.focus_results"
+            "ctrl+g,alt+r,alt+3",
+            "focus_results",
+            "Results",
+            False,
+            priority=True,
+            id="main.focus_results",
         ),
         Binding("f6", "cycle_focus(1)", "Next pane", False, priority=True, id="main.next_pane"),
         Binding(

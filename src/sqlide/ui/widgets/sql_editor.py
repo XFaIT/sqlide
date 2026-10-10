@@ -41,12 +41,16 @@ def _tinted(seg: Segment, tint: Style) -> Style:
 
 class SqlEditor(TextArea):
     BINDINGS = [
-        Binding("f5,ctrl+j,ctrl+enter", "run_statement", "Run", priority=True, id="editor.run"),
+        Binding("ctrl+j,f5,ctrl+enter", "run_statement", "Run", priority=True, id="editor.run"),
         Binding(
-            "shift+f5,ctrl+shift+enter", "run_all", "Run all", priority=True, id="editor.run_all"
+            "ctrl+r,shift+f5,ctrl+shift+enter",
+            "run_all",
+            "Run all",
+            priority=True,
+            id="editor.run_all",
         ),
         Binding("ctrl+space,ctrl+@", "complete", "Complete", show=False, id="editor.complete"),
-        Binding("ctrl+alt+l,f7", "format", "Format", show=False, id="editor.format"),
+        Binding("ctrl+l,f7,ctrl+alt+l", "format", "Format", show=False, id="editor.format"),
         Binding(
             "ctrl+slash,ctrl+underscore,alt+slash",
             "toggle_comment",
@@ -54,6 +58,7 @@ class SqlEditor(TextArea):
             show=False,
             id="editor.toggle_comment",
         ),
+        Binding("ctrl+a", "select_all", "Select all", show=False, id="editor.select_all"),
     ]
 
     class RunRequested(Message):

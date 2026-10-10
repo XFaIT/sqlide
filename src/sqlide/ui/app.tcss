@@ -89,4 +89,7 @@ ScopeScreen { align: center middle; }
     background: $surface;
 }
 #help-title { text-style: bold; }
-#help-log { height: 1fr; }
+#help-list { height: 1fr; }
+#rebind-box { width: 50; height: auto; padding: 1 2; border: round $primary; background: $surface; align-horizontal: center; }
+#rebind-title { text-style: bold; }
+RebindScreen { align: center middle; }

@@ -30,13 +30,14 @@ def _doctor() -> int:
 
 def _keys() -> int:
     from sqlide.config import paths
-    from sqlide.ui.keymap import catalogue
+    from sqlide.ui.keymap import catalogue, format_keys
 
-    print(f'Override in {paths.keymap_file()}  ([keys] id = "key,key")\n')
+    print(f'Override in {paths.keymap_file()}  ([keys] id = "key,key")\n* = overridden\n')
     infos = catalogue()
     width = max(len(i.id) for i in infos)
     for i in infos:
-        print(f"{i.id:<{width}}  {i.keys:<40}  {i.description}")
+        mark = "*" if i.overridden else " "
+        print(f"{i.id:<{width}} {mark}{format_keys(i.keys):<34}  {i.description}")
     return 0
 
 

@@ -69,7 +69,7 @@ class ResultGrid(ScrollView, can_focus=True):
         Binding("ctrl+c", "copy", "Copy", id="grid.copy"),
         Binding("y", "copy_menu", "Copy as…", id="grid.copy_menu"),
         Binding("enter", "view_value", "View value", id="grid.view_value"),
-        Binding("slash", "filter", "Filter", id="grid.filter"),
+        Binding("ctrl+f,slash", "filter", "Filter", id="grid.filter"),
         Binding("l", "load_more", "More rows", show=False, id="grid.load_more"),
         Binding("L", "load_all", "All rows", show=False, id="grid.load_all"),
         Binding("e", "export", "Export", id="grid.export"),

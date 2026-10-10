@@ -53,6 +53,6 @@ async def test_f1_opens_help_listing_keys(make_ws):
         await pilot.press("f1")
         await wait_for(pilot, lambda: isinstance(app.screen, HelpScreen))
         await pilot.pause()
-        assert len(app.screen.query_one("#help-log").lines) > 10
+        assert app.screen.query_one("#help-list").option_count > 10
         await pilot.press("escape")
         await wait_for(pilot, lambda: not isinstance(app.screen, HelpScreen))

@@ -354,3 +354,54 @@ async def test_in_memory_database_keeps_the_shared_session(make_ws):
         await connect_first(pilot, app)
         await pilot.pause(0.5)
         assert active(app).meta_session is None
+
+
+async def test_ctrl_keys_run_statement_and_run_all(make_ws):
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("ctrlkeys"))))
+    async with app.run_test(size=(120, 40)) as pilot:
+        await connect_first(pilot, app)
+        c = active(app)
+        c.editor.text = "select 1 as a"
+        c.editor.focus()
+        await pilot.press("ctrl+j")
+        await wait_for(pilot, lambda: len(grids(app)) == 1 and not c.running)
+        c.editor.text = "select 1 as a;\nselect 2 as b;"
+        c.editor.focus()
+        await pilot.press("ctrl+r")
+        await wait_for(pilot, lambda: len(grids(app)) == 2 and not c.running)
+
+
+async def test_ctrl_a_selects_the_whole_text(make_ws):
+    app = SqlideApp(make_ws())
+    async with app.run_test(size=(120, 40)) as pilot:
+        await pilot.pause()
+        ed = active(app).editor
+        ed.text = "select 1;\nselect 2"
+        ed.focus()
+        await pilot.press("ctrl+a")
+        assert ed.selected_text == "select 1;\nselect 2"
+
+
+async def test_help_rebinds_a_key_and_saves_it(make_ws, tmp_path, monkeypatch):
+    from sqlide.config.keymap import load_keymap
+    from sqlide.ui.screens.help import HelpScreen, RebindScreen
+
+    monkeypatch.setenv("SQLIDE_CONFIG_DIR", str(tmp_path / "cfg"))
+    app = SqlideApp(make_ws(Connection("h", "h2", URL.format("rebind"))))
+    async with app.run_test(size=(120, 40)) as pilot:
+        await connect_first(pilot, app)
+        await pilot.press("f1")
+        await wait_for(pilot, lambda: isinstance(app.screen, HelpScreen))
+        listing = app.screen.query_one("#help-list")
+        listing.highlighted = listing.get_option_index("editor.run")
+        await pilot.press("enter")
+        await wait_for(pilot, lambda: isinstance(app.screen, RebindScreen))
+        await pilot.press("f4")
+        await wait_for(pilot, lambda: isinstance(app.screen, HelpScreen))
+        assert load_keymap() == {"editor.run": "f4"}
+        await pilot.press("escape")
+        c = active(app)
+        c.editor.text = "select 5"
+        c.editor.focus()
+        await pilot.press("f4")
+        await wait_for(pilot, lambda: len(grids(app)) == 1)
