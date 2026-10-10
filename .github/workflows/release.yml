@@ -15,3 +15,44 @@ jobs:
       - uses: astral-sh/setup-uv@v5
       - run: uv build
       - run: uv publish
+
+  homebrew:
+    # Opens a PR in the tap with the new url/sha256 once the sdist is on PyPI.
+    # Needs the TAP_TOKEN secret: a fine-grained token for XFaIT/homebrew-sqlide
+    # with Contents and Pull requests read/write.
+    needs: pypi
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.TAP_TOKEN }}
+    steps:
+      - name: Check the token exists
+        run: test -n "$GH_TOKEN" || { echo "::error::secret TAP_TOKEN is not set"; exit 1; }
+      - name: Wait for the sdist on PyPI
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          for _ in $(seq 1 60); do
+            curl -sf "https://pypi.org/pypi/sqlide/$version/json" -o pypi.json && \
+              python3 -I - "$version" <<'PY' && exit 0
+          import json, sys
+          d = json.load(open("pypi.json"), strict=False)
+          sdist = next(u for u in d["urls"] if u["packagetype"] == "sdist")
+          open("formula.env", "w").write(f"URL={sdist['url']}\nSHA={sdist['digests']['sha256']}\n")
+          PY
+            sleep 20
+          done
+          echo "::error::sqlide $version never appeared on PyPI"; exit 1
+      - name: Open the tap PR
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          . ./formula.env
+          gh repo clone XFaIT/homebrew-sqlide tap -- -q
+          cd tap
+          sed -i "s|^  url \".*\"|  url \"$URL\"|; s|^  sha256 \".*\"|  sha256 \"$SHA\"|" Formula/sqlide.rb
+          git diff --quiet && { echo "formula already up to date"; exit 0; }
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -c "release/$version"
+          git commit -qam "sqlide $version"
+          git push -q origin "release/$version"
+          gh pr create -R XFaIT/homebrew-sqlide -B main -H "release/$version" \
+            -t "sqlide $version" -b "url and sha256 of the $version sdist on PyPI. Opened by the release workflow."
