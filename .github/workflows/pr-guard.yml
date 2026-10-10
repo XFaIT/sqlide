@@ -1,0 +1,17 @@
+name: PR guard
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Branch name and version bump
+        run: python3 scripts/check_version.py "$HEAD_REF" "origin/${{ github.base_ref }}"
+        env:
+          HEAD_REF: ${{ github.head_ref }}

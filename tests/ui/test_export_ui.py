@@ -5,7 +5,7 @@ import sys
 
 import pytest
 from openpyxl import load_workbook
-from textual.widgets import Input, RadioButton, RadioSet, Select, Static, Switch
+from textual.widgets import Button, Input, RadioButton, RadioSet, Select, Static, Switch
 
 from sqlide.app import SqlideApp
 from sqlide.config.connections import Connection
@@ -117,13 +117,13 @@ async def test_overwrite_is_guarded(make_ws, tmp_path):
         await run_query(pilot, app, "select 1 as a")
         dlg = await open_export(pilot, app)
         dlg.query_one("#path", Input).value = str(existing)
-        await pilot.click("#export")
+        dlg.query_one("#export", Button).press()
         await wait_for(pilot, lambda: bool(str(dlg.query_one("#error", Static).render()).strip()))
         assert "exists" in str(dlg.query_one("#error", Static).render())
         assert isinstance(app.screen, ExportScreen)  # still open
         assert existing.read_text() == "precious"
         dlg.query_one("#overwrite", Switch).value = True
-        await pilot.click("#export")
+        dlg.query_one("#export", Button).press()
         await wait_for(
             pilot, lambda: not console(app)._exporting and existing.read_text() != "precious"
         )
