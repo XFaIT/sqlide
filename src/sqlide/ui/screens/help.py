@@ -10,11 +10,10 @@ from textual.screen import ModalScreen
 from textual.widgets import Label, OptionList
 from textual.widgets.option_list import Option
 
-from sqlide.config.keymap import load_keymap, save_override
+from sqlide.config.keymap import is_modifier_only, load_keymap, save_override
+from sqlide.ui.widgets.sql_editor import SqlEditor
 
 EXTRA = (("Command palette (every action by name)", "Ctrl+P"),)
-
-_MODIFIER_KEYS = {"shift", "ctrl", "alt", "super", "meta", "hyper", "caps_lock"}
 
 
 class RebindScreen(ModalScreen[str | None]):
@@ -35,7 +34,7 @@ class RebindScreen(ModalScreen[str | None]):
         event.prevent_default()
         if event.key == "escape":
             self.dismiss(None)
-        elif event.key not in _MODIFIER_KEYS:
+        elif not is_modifier_only(event.key):  # wait for the key that follows the modifier
             self.dismiss(event.key)
 
 
@@ -118,6 +117,8 @@ class HelpScreen(ModalScreen[None]):
         if main is not None:
             main.toolbar.refresh_tips()  # tooltips show the new key at once
         self._fill(action_id)
+        for editor in self.app.query(SqlEditor):
+            editor.refresh_placeholder()
 
     def action_close(self) -> None:
         self.dismiss(None)

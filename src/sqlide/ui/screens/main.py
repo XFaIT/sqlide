@@ -158,7 +158,10 @@ class MainScreen(Screen):
         self.run_worker(self._warm_jvm, thread=True, group="jvm")
         self.set_interval(0.4, self._sync_toolbar)  # dim/undim buttons; nothing touches a database
         if not self.ws.connections():
-            self.console.panel.log_line("No connections yet: press Ctrl+N to add one.", "yellow")
+            from sqlide.ui.keymap import keys_for  # late: keymap imports this module
+
+            add = keys_for("main.new_connection") or "the + button"
+            self.console.panel.log_line(f"No connections yet: press {add} to add one.", "yellow")
 
     def _warm_jvm(self) -> None:
         # start in the background so the first connect is fast; errors surface on connect
