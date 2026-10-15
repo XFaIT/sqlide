@@ -86,7 +86,7 @@ class SqlEditor(TextArea):
             show_line_numbers=True,
             soft_wrap=False,
             tab_behavior="indent",
-            placeholder="-- connect (sidebar: Enter), then Ctrl+J / F5 runs the framed statement",
+            placeholder=self._placeholder_text(),
             **kw,
         )
         self._dialect = dialect
@@ -100,6 +100,16 @@ class SqlEditor(TextArea):
         self._accepting = False
 
     # --- configuration ---
+    @staticmethod
+    def _placeholder_text() -> str:
+        from sqlide.ui.keymap import keys_for  # late: keymap imports this module
+
+        run = keys_for("editor.run", limit=2) or "the Run button"
+        return f"-- connect (sidebar: Enter), then {run} runs the framed statement"
+
+    def refresh_placeholder(self) -> None:
+        self.placeholder = self._placeholder_text()
+
     @property
     def dialect(self) -> str:
         return self._dialect

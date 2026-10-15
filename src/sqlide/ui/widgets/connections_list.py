@@ -34,8 +34,11 @@ class ConnectionsList(ListView):
         for c in connections:
             self.append(ConnectionItem(c))
         if not connections:
+            from sqlide.ui.keymap import keys_for  # late: keymap imports the screens
+
+            add = keys_for("main.new_connection") or "the + button"
             self.append(
-                ListItem(Label("No connections yet"), Label("Ctrl+N to add one", classes="dim"))
+                ListItem(Label("No connections yet"), Label(f"{add} to add one", classes="dim"))
             )
         if connections:  # Enter must work without pressing Down first
             self.call_after_refresh(setattr, self, "index", 0)

@@ -135,7 +135,11 @@ class SchemaTree(Tree[object]):
     def mark_stale(self) -> None:
         """A DDL statement ran: the cache is dropped, but the tree waits for F5."""
         if self._meta is not None:
-            self.root.set_label(f"{self._label}  ⟳ changed, F5 to refresh")
+            from sqlide.ui.keymap import keys_for  # late: keymap imports this module
+
+            self.root.set_label(
+                f"{self._label}  ⟳ changed, {keys_for('schema.refresh')} to refresh"
+            )
 
     def action_choose_scope(self) -> None:
         if self._meta is not None and self._conn is not None:

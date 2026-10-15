@@ -9,6 +9,14 @@ import jpype.config
 
 from sqlide.jvm.locate import JvmInfo, locate_jvm
 
+# Databricks (and other Arrow based) drivers read result sets through java.nio internals;
+# on Java 17+ without --add-opens the query is sent but fetching the result hangs or fails.
+JVM_ARGS = (
+    "-Djava.awt.headless=true",
+    "--add-opens=java.base/java.nio=ALL-UNNAMED",
+    "-Dio.netty.tryReflectionSetAccessible=true",
+)
+
 _lock = threading.Lock()
 _info: JvmInfo | None = None
 
@@ -24,7 +32,7 @@ def ensure_jvm() -> JvmInfo:
             # We start the JVM from worker threads; DestroyJavaVM at interpreter exit then
             # hangs. Sessions are closed explicitly, so skipping the JVM teardown loses nothing.
             jpype.config.destroy_jvm = False
-            jpype.startJVM(str(info.libjvm), "-Djava.awt.headless=true", convertStrings=False)
+            jpype.startJVM(str(info.libjvm), *JVM_ARGS, convertStrings=False)
             _silence_jvm_streams()
         _info = info
         return info

@@ -411,7 +411,10 @@ class ConsoleTab(ExportActions, Vertical):
                     "Not connected: pick a connection in the sidebar", severity="warning"
                 )
         elif self._executing:
-            self.app.notify("A query is running (Ctrl+F2 cancels it)", severity="warning")
+            from sqlide.ui.keymap import keys_for  # late: keymap imports this module
+
+            cancel = keys_for("console.cancel") or "the Stop button"
+            self.app.notify(f"A query is running ({cancel} cancels it)", severity="warning")
         else:
             self.run_worker(self._run(statements), group="run")
 
